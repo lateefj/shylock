@@ -4,37 +4,62 @@
 package main
 
 import (
+	"log"
 	"sync"
 	"time"
-
-	log "github.com/Sirupsen/logrus"
 )
+
+type ByteLimit struct {
+	Bytes    uint64
+	Limit    uint64
+	Mutex    *sync.RWMutex
+	Notifier *sync.Cond
+}
+
+func (bl *ByteLimit) Reset() {
+	defer bl.Notifier.Broadcast()
+	defer bl.Mutex.Unlock()
+	bl.Mutex.Lock()
+	bl.Bytes = bl.Limit
+}
+
+func (bl *ByteLimit) Available() uint64 {
+	defer bl.Mutex.RUnlock()
+	bl.Mutex.RLock()
+	return bl.Bytes
+}
 
 // IOC  Input / Ouput Constraint
 type IOC struct {
 	duration    time.Duration
-	bytes       uint64
 	limit       uint64
-	lock        *sync.RWMutex
-	notifier    *sync.Cond
+	Mutex       *sync.RWMutex
+	Notifier    *sync.Cond
+	readLimit   *ByteLimit
+	writeLimit  *ByteLimit
 	resetTicker *time.Ticker
 }
 
-func NewIOC(duration time.Duration, limit uint64) *IOC {
-	ioc := &IOC{duration: duration, limit: limit, notifier: &sync.Cond{L: &sync.Mutex{}}, lock: &sync.RWMutex{}, resetTicker: time.NewTicker(duration)}
+func NewIOC(duration time.Duration, rLimit, wLimit uint64) *IOC {
+	readLimit := &ByteLimit{Limit: rLimit, Notifier: &sync.Cond{L: &sync.Mutex{}}, Mutex: &sync.RWMutex{}}
+	writeLimit := &ByteLimit{Limit: wLimit, Notifier: &sync.Cond{L: &sync.Mutex{}}, Mutex: &sync.RWMutex{}}
+
+	ioc := &IOC{duration: duration, readLimit: readLimit, writeLimit: writeLimit, resetTicker: time.NewTicker(duration)}
 	ioc.reset()
 	return ioc
 }
 func (ioc *IOC) reset() {
-	defer ioc.notifier.Broadcast()
-	defer ioc.lock.Unlock()
-	ioc.lock.Lock()
-	ioc.bytes = ioc.limit
+	log.Println("Resetting ioc")
+	ioc.readLimit.Reset()
+	ioc.writeLimit.Reset()
 }
 
 func (ioc *IOC) Start() {
-	for _ = range ioc.resetTicker.C {
-		ioc.reset()
+	for {
+		select {
+		case <-ioc.resetTicker.C:
+			ioc.reset()
+		}
 	}
 }
 
@@ -42,39 +67,48 @@ func (ioc *IOC) Stop() {
 	ioc.resetTicker.Stop()
 }
 
-func (ioc *IOC) Available() uint64 {
-	defer ioc.lock.RUnlock()
-	ioc.lock.RLock()
-	return ioc.bytes
-
-}
-
-// BytesCheckout
-func (ioc *IOC) BytesCheckout(requested uint64, stream chan uint64) error {
+// Checkout
+func (ioc *IOC) Checkout(bl *ByteLimit, requested uint64, stream chan uint64) error {
 	for requested > 0 {
-		log.Infof("Requested is %d current bytes %d", requested, ioc.Available())
+		start := time.Now()
 		var out uint64
-		ioc.lock.Lock()
-		if ioc.bytes >= requested {
+		bl.Mutex.Lock()
+		if bl.Bytes >= requested {
 			out = requested
-			ioc.bytes = ioc.bytes - requested
+			bl.Bytes = bl.Bytes - requested
 		} else {
-			out = ioc.bytes
-			ioc.bytes = 0
+			out = bl.Bytes
+			bl.Bytes = 0
 		}
 
-		ioc.lock.Unlock()
+		bl.Mutex.Unlock()
+		dl := time.Now().Sub(start)
+		log.Printf("Lock  Time diff %v", dl)
 		if out > 0 {
 			stream <- out
 		}
 		requested = requested - out
-		log.Infof("Requested %d after out is %d", requested, out)
 		if requested > 0 {
-			ioc.notifier.L.Lock()
-			ioc.notifier.Wait()
-			ioc.notifier.L.Unlock()
+			s := time.Now()
+			bl.Notifier.L.Lock()
+			bl.Notifier.Wait()
+			bl.Notifier.L.Unlock()
+			d := time.Now().Sub(s)
+			log.Printf("Notifier Time diff %v", d)
 		}
+		end := time.Now()
+		diff := end.Sub(start)
+		log.Printf("Time diff %v", diff)
+
 	}
+	log.Println("Closing stream all done with checkout")
 	close(stream)
 	return nil
+}
+
+func (ioc *IOC) CheckoutRead(requested uint64, stream chan uint64) error {
+	return ioc.Checkout(ioc.readLimit, requested, stream)
+}
+func (ioc *IOC) CheckoutWrite(requested uint64, stream chan uint64) error {
+	return ioc.Checkout(ioc.writeLimit, requested, stream)
 }

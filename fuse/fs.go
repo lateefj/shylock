@@ -28,7 +28,7 @@ type SFS struct {
 }
 
 func NewSFS(path string) *SFS {
-	ioc := NewIOC(1*time.Second, uint64(10))
+	ioc := NewIOC(10*time.Second, uint64(1), uint64(1))
 	go ioc.Start()
 	return &SFS{Path: path, IOC: ioc}
 }
@@ -83,11 +83,17 @@ func (sd *SDir) Attr(ctx context.Context, a *fuse.Attr) error {
 	return nil
 }
 
+func isDir(path string) bool {
+	if path[:len(path)-1] == "/" {
+		return true
+	}
+	return false
+}
 func (sd *SDir) Lookup(ctx context.Context, req *fuse.LookupRequest, resp *fuse.LookupResponse) (fs.Node, error) {
 	path := sd.Path + "/" + req.Name
 	_, err := os.Stat(path)
 	if os.IsNotExist(err) {
-		if req.Name[:len(req.Name)-1] == "/" {
+		if isDir(req.Name) {
 			return &SDir{Path: path, IOC: sd.IOC}, nil
 		} else {
 			return &SFile{Path: path, ioc: sd.IOC}, nil
@@ -140,6 +146,28 @@ func (sd *SDir) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error) {
 // Register callback
 var _ = fs.HandleReadDirAller(&SDir{})
 
+func (sd *SDir) Remove(ctx context.Context, req *fuse.RemoveRequest) error {
+
+	path := sd.Path + "/" + req.Name
+	log.Infof("Removing file %s", req.Name)
+	if req.Dir {
+		return os.RemoveAll(path)
+	} else {
+		return os.Remove(path)
+	}
+}
+
+var _ = fs.NodeRemover(&SDir{})
+
+func (sd *SDir) Create(ctx context.Context, req *fuse.CreateRequest, resp *fuse.CreateResponse) (fs.Node, fs.Handle, error) {
+	path := sd.Path + "/" + req.Name
+
+	f := &SFile{Path: path, ioc: sd.IOC}
+	return f, f, nil
+}
+
+var _ = fs.NodeCreater(&SDir{})
+
 type SFile struct {
 	Path string
 	ioc  *IOC
@@ -176,7 +204,10 @@ var _ = fs.NodeOpener(&SFile{})
 func (sf *SFile) Open(ctx context.Context, req *fuse.OpenRequest, resp *fuse.OpenResponse) (fs.Handle, error) {
 
 	file, err := os.Open(sf.Path)
-	if err != nil && !os.IsNotExist(err) {
+	if os.IsNotExist(err) {
+		file, err = os.Create(sf.Path)
+	}
+	if err != nil {
 		log.Errorf("Failed to open SFil.Open %s", err)
 		return nil, err
 	}
@@ -198,7 +229,7 @@ var _ = fs.HandleReader(&SFile{})
 func (sfh *SFile) Read(ctx context.Context, req *fuse.ReadRequest, resp *fuse.ReadResponse) error {
 	log.Debugf("Copying bytes: %d", req.Size)
 	stream := make(chan uint64, 1)
-	go sfh.ioc.BytesCheckout(uint64(req.Size), stream)
+	go sfh.ioc.CheckoutRead(uint64(req.Size), stream)
 	checkedOut := uint64(0)
 	for c := range stream {
 		log.Debugf("Got %d more bytes", c)
@@ -223,15 +254,15 @@ func (sf *SFile) Write(ctx context.Context, req *fuse.WriteRequest, resp *fuse.W
 	size := len(req.Data)
 	log.Debugf("Writing  bytes: %d", size)
 	stream := make(chan uint64, 1)
-	go sf.ioc.BytesCheckout(uint64(size), stream)
+	go sf.ioc.CheckoutWrite(uint64(size), stream)
 	checkedOut := uint64(0)
 	for c := range stream {
 		log.Debugf("Got %d more bytes", c)
 		checkedOut += c
 	}
 
-	sf.file.Seek(req.Offset, 0)
-	n, err := sf.file.Write(req.Data)
+	//sf.file.Seek(req.Offset, 0)
+	n, err := sf.file.WriteAt(req.Data, req.Offset)
 	if err != nil {
 		log.Errorf("Failed to write to file %s with offset %d", err, req.Offset)
 	}
