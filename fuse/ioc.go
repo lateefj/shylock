@@ -4,7 +4,6 @@
 package main
 
 import (
-	"log"
 	"sync"
 	"time"
 )
@@ -49,7 +48,6 @@ func NewIOC(duration time.Duration, rLimit, wLimit uint64) *IOC {
 	return ioc
 }
 func (ioc *IOC) reset() {
-	log.Println("Resetting ioc")
 	ioc.readLimit.Reset()
 	ioc.writeLimit.Reset()
 }
@@ -70,7 +68,7 @@ func (ioc *IOC) Stop() {
 // Checkout
 func (ioc *IOC) Checkout(bl *ByteLimit, requested uint64, stream chan uint64) error {
 	for requested > 0 {
-		start := time.Now()
+		//start := time.Now()
 		var out uint64
 		bl.Mutex.Lock()
 		if bl.Bytes >= requested {
@@ -82,26 +80,22 @@ func (ioc *IOC) Checkout(bl *ByteLimit, requested uint64, stream chan uint64) er
 		}
 
 		bl.Mutex.Unlock()
-		dl := time.Now().Sub(start)
-		log.Printf("Lock  Time diff %v", dl)
+		//dl := time.Now().Sub(start)
 		if out > 0 {
 			stream <- out
 		}
 		requested = requested - out
 		if requested > 0 {
-			s := time.Now()
+			//s := time.Now()
 			bl.Notifier.L.Lock()
 			bl.Notifier.Wait()
 			bl.Notifier.L.Unlock()
-			d := time.Now().Sub(s)
-			log.Printf("Notifier Time diff %v", d)
+			//d := time.Now().Sub(s)
 		}
-		end := time.Now()
-		diff := end.Sub(start)
-		log.Printf("Time diff %v", diff)
+		//end := time.Now()
+		//diff := end.Sub(start)
 
 	}
-	log.Println("Closing stream all done with checkout")
 	close(stream)
 	return nil
 }

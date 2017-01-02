@@ -1,14 +1,15 @@
 package main
 
 import (
+	"fmt"
 	"io"
 	"io/ioutil"
+	"log"
 	"os"
 	"time"
 
 	"bazil.org/fuse"
 	"bazil.org/fuse/fs"
-	log "github.com/Sirupsen/logrus"
 	"golang.org/x/net/context"
 )
 
@@ -48,7 +49,7 @@ type SDir struct {
 func (sd *SDir) File() (*os.File, error) {
 	f, err := os.Open(sd.Path)
 	if err != nil {
-		log.Errorf("Failed in SDir.File: %s", err)
+		log.Println("Failed in SDir.File: %s", err)
 	}
 	return f, err
 
@@ -102,12 +103,12 @@ func (sd *SDir) Lookup(ctx context.Context, req *fuse.LookupRequest, resp *fuse.
 	f, err := os.Open(path)
 	defer f.Close()
 	if err != nil && !os.IsExist(err) {
-		log.Errorf("SDir lookup: File path %s does not exist :( error: %s", path, err)
+		log.Printf("SDir lookup: File path %s does not exist :( error: %s", path, err)
 		return nil, err
 	}
 
 	if err != nil {
-		log.Errorf("SDir Lookup file %s is nil error: %s", path, err)
+		log.Printf("SDir Lookup file %s is nil error: %s", path, err)
 	}
 	stat, err := f.Stat()
 	if err != nil {
@@ -149,7 +150,7 @@ var _ = fs.HandleReadDirAller(&SDir{})
 func (sd *SDir) Remove(ctx context.Context, req *fuse.RemoveRequest) error {
 
 	path := sd.Path + "/" + req.Name
-	log.Infof("Removing file %s", req.Name)
+	fmt.Printf("Removing file %s\n", req.Name)
 	if req.Dir {
 		return os.RemoveAll(path)
 	} else {
@@ -187,12 +188,12 @@ func (sf *SFile) Attr(ctx context.Context, a *fuse.Attr) error {
 		return nil
 	}
 	if err != nil {
-		log.Errorf("Failed to open file for attr %s", err)
+		log.Printf("Failed to open file for attr %s", err)
 		return err
 	}
 	info, err := file.Stat()
 	if err != nil {
-		log.Errorf("Stat failed for file %s open attr %s", sf.Path, err)
+		log.Printf("Stat failed for file %s open attr %s", sf.Path, err)
 		return err
 	}
 	fileAttr(info, a)
@@ -208,7 +209,7 @@ func (sf *SFile) Open(ctx context.Context, req *fuse.OpenRequest, resp *fuse.Ope
 		file, err = os.Create(sf.Path)
 	}
 	if err != nil {
-		log.Errorf("Failed to open SFil.Open %s", err)
+		log.Printf("Failed to open SFil.Open %s", err)
 		return nil, err
 	}
 
@@ -227,12 +228,12 @@ func (sfh *SFile) Release(ctx context.Context, req *fuse.ReleaseRequest) error {
 var _ = fs.HandleReader(&SFile{})
 
 func (sfh *SFile) Read(ctx context.Context, req *fuse.ReadRequest, resp *fuse.ReadResponse) error {
-	log.Debugf("Copying bytes: %d", req.Size)
+	fmt.Println("Copying bytes: %d", req.Size)
 	stream := make(chan uint64, 1)
 	go sfh.ioc.CheckoutRead(uint64(req.Size), stream)
 	checkedOut := uint64(0)
 	for c := range stream {
-		log.Debugf("Got %d more bytes", c)
+		fmt.Println("Got %d more bytes", c)
 		checkedOut += c
 	}
 
@@ -240,11 +241,11 @@ func (sfh *SFile) Read(ctx context.Context, req *fuse.ReadRequest, resp *fuse.Re
 	sfh.file.Seek(req.Offset, 0)
 	n, err := sfh.file.Read(buf)
 	if err == io.ErrUnexpectedEOF || err == io.EOF {
-		log.Errorf("IO Error %S", err)
+		log.Printf("IO Error %S", err)
 		err = nil
 	}
 	resp.Data = buf[:n]
-	log.Debugf("Ok copied %d", len(resp.Data))
+	fmt.Println("Ok copied %d", len(resp.Data))
 	return err
 }
 
@@ -252,22 +253,22 @@ var _ = fs.HandleWriter(&SFile{})
 
 func (sf *SFile) Write(ctx context.Context, req *fuse.WriteRequest, resp *fuse.WriteResponse) error {
 	size := len(req.Data)
-	log.Debugf("Writing  bytes: %d", size)
+	fmt.Println("Writing  bytes: %d", size)
 	stream := make(chan uint64, 1)
 	go sf.ioc.CheckoutWrite(uint64(size), stream)
 	checkedOut := uint64(0)
 	for c := range stream {
-		log.Debugf("Got %d more bytes", c)
+		fmt.Println("Got %d more bytes", c)
 		checkedOut += c
 	}
 
 	//sf.file.Seek(req.Offset, 0)
 	n, err := sf.file.WriteAt(req.Data, req.Offset)
 	if err != nil {
-		log.Errorf("Failed to write to file %s with offset %d", err, req.Offset)
+		log.Printf("Failed to write to file %s with offset %d", err, req.Offset)
 	}
 	resp.Size = n
-	log.Debugf("Wrote %d bytes", n)
+	fmt.Println("Wrote %d bytes", n)
 	return err
 }
 
@@ -287,7 +288,7 @@ func mount(path, mountpoint string) error {
 	filesys := NewSFS(path)
 
 	if err := fs.Serve(c, filesys); err != nil {
-		log.Errorf("Failed to server because %s", err)
+		log.Printf("Failed to server because %s", err)
 
 		return err
 	}
@@ -295,7 +296,7 @@ func mount(path, mountpoint string) error {
 	// check if the mount process has an error to report
 	<-c.Ready
 	if err := c.MountError; err != nil {
-		log.Errorf("Faield to mount because %s", err)
+		log.Printf("Faield to mount because %s", err)
 		return err
 	}
 	return nil
