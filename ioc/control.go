@@ -1,9 +1,12 @@
 // IOC Input Output Constraint
 // Controls the volume of input and output base
 
-package main
+// XXX: This is Proof of concept code not optimized
+
+package ioc
 
 import (
+	"errors"
 	"sync"
 	"time"
 )
@@ -31,19 +34,19 @@ func (bl *ByteLimit) Available() uint64 {
 // IOC  Input / Ouput Constraint
 type IOC struct {
 	duration    time.Duration
-	limit       uint64
-	Mutex       *sync.RWMutex
+	Mutex       sync.RWMutex
 	Notifier    *sync.Cond
 	readLimit   *ByteLimit
 	writeLimit  *ByteLimit
 	resetTicker *time.Ticker
+	active      bool
 }
 
 func NewIOC(duration time.Duration, rLimit, wLimit uint64) *IOC {
 	readLimit := &ByteLimit{Limit: rLimit, Notifier: &sync.Cond{L: &sync.Mutex{}}, Mutex: &sync.RWMutex{}}
 	writeLimit := &ByteLimit{Limit: wLimit, Notifier: &sync.Cond{L: &sync.Mutex{}}, Mutex: &sync.RWMutex{}}
 
-	ioc := &IOC{duration: duration, readLimit: readLimit, writeLimit: writeLimit, resetTicker: time.NewTicker(duration)}
+	ioc := &IOC{duration: duration, Mutex: sync.RWMutex{}, readLimit: readLimit, writeLimit: writeLimit, resetTicker: time.NewTicker(duration), active: false}
 	ioc.reset()
 	return ioc
 }
@@ -53,6 +56,9 @@ func (ioc *IOC) reset() {
 }
 
 func (ioc *IOC) Start() {
+	ioc.Mutex.Lock()
+	ioc.active = true
+	ioc.Mutex.Unlock()
 	for {
 		select {
 		case <-ioc.resetTicker.C:
@@ -62,41 +68,54 @@ func (ioc *IOC) Start() {
 }
 
 func (ioc *IOC) Stop() {
+	ioc.Mutex.Lock()
+	ioc.active = false
+	ioc.Mutex.Unlock()
 	ioc.resetTicker.Stop()
 }
 
+func (ioc *IOC) Active() bool {
+	ioc.Mutex.RLock()
+	defer ioc.Mutex.RUnlock()
+	return ioc.active
+}
+
 // Checkout
+// TODO: Would like to eventually measure back pressure if possible
 func (ioc *IOC) Checkout(bl *ByteLimit, requested uint64, stream chan uint64) error {
+
+	defer close(stream)
+
 	for requested > 0 {
-		//start := time.Now()
+		// If the io controller is still active
+		if !ioc.Active() {
+			return errors.New("IOC is not active")
+		}
 		var out uint64
 		bl.Mutex.Lock()
+		// If the amount requested is greater than what is avaialble
 		if bl.Bytes >= requested {
 			out = requested
 			bl.Bytes = bl.Bytes - requested
-		} else {
+		} else { // Less then what is available then give it all out
 			out = bl.Bytes
 			bl.Bytes = 0
 		}
 
 		bl.Mutex.Unlock()
-		//dl := time.Now().Sub(start)
+		// If there are any bytes available
 		if out > 0 {
 			stream <- out
 		}
+		// Update the amount needed requested
 		requested = requested - out
+		// If there are more bytes requested then wait for reset
 		if requested > 0 {
-			//s := time.Now()
 			bl.Notifier.L.Lock()
 			bl.Notifier.Wait()
 			bl.Notifier.L.Unlock()
-			//d := time.Now().Sub(s)
 		}
-		//end := time.Now()
-		//diff := end.Sub(start)
-
 	}
-	close(stream)
 	return nil
 }
 
