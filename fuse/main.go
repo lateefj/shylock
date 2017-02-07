@@ -13,7 +13,6 @@ const (
 
 func usage() {
 	fmt.Fprintf(os.Stderr, "Usage of %s:\n", progName)
-	fmt.Fprintf(os.Stderr, "  %s ZIP MOUNTPOINT\n", progName)
 	flag.PrintDefaults()
 }
 func main() {
@@ -23,14 +22,13 @@ func main() {
 	flag.Usage = usage
 	flag.Parse()
 
-	if flag.NArg() != 2 {
+	if flag.NArg() != 1 {
 		usage()
 		os.Exit(2)
 	}
-	path := flag.Arg(0)
-	mountPoint := flag.Arg(1)
-	log.Printf("Path %s mount point %s", path, mountPoint)
-	if err := mount(path, mountPoint); err != nil {
+	mountPoint := flag.Arg(0)
+	log.Printf("Mount point %s\n", mountPoint)
+	if err := mount(mountPoint); err != nil {
 		log.Fatal(err)
 	}
 }

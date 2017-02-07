@@ -29,7 +29,8 @@ type SFS struct {
 }
 
 func NewSFS(path string) *SFS {
-	ioc := NewIOC(10*time.Second, uint64(1), uint64(1))
+	//TODO: Read from configuration file
+	ioc := NewIOC(10*time.Second, uint64(1000), uint64(5))
 	go ioc.Start()
 	return &SFS{Path: path, IOC: ioc}
 }
@@ -37,7 +38,6 @@ func NewSFS(path string) *SFS {
 func (sfs *SFS) Root() (fs.Node, error) {
 	d := &SDir{SFS: sfs, IOC: sfs.IOC, Path: sfs.Path}
 	return d, nil
-
 }
 
 type SDir struct {
@@ -49,7 +49,7 @@ type SDir struct {
 func (sd *SDir) File() (*os.File, error) {
 	f, err := os.Open(sd.Path)
 	if err != nil {
-		log.Println("Failed in SDir.File: %s", err)
+		log.Printf("Failed in SDir.File: %s\n", err)
 	}
 	return f, err
 
@@ -209,7 +209,7 @@ func (sf *SFile) Open(ctx context.Context, req *fuse.OpenRequest, resp *fuse.Ope
 		file, err = os.Create(sf.Path)
 	}
 	if err != nil {
-		log.Printf("Failed to open SFil.Open %s", err)
+		log.Printf("Failed to open SFile.Open %s\n", err)
 		return nil, err
 	}
 
@@ -228,12 +228,12 @@ func (sfh *SFile) Release(ctx context.Context, req *fuse.ReleaseRequest) error {
 var _ = fs.HandleReader(&SFile{})
 
 func (sfh *SFile) Read(ctx context.Context, req *fuse.ReadRequest, resp *fuse.ReadResponse) error {
-	fmt.Println("Copying bytes: %d", req.Size)
+	fmt.Printf("Copying bytes: %d\n", req.Size)
 	stream := make(chan uint64, 1)
 	go sfh.ioc.CheckoutRead(uint64(req.Size), stream)
 	checkedOut := uint64(0)
 	for c := range stream {
-		fmt.Println("Got %d more bytes", c)
+		fmt.Printf("Reading got %d more bytes\n", c)
 		checkedOut += c
 	}
 
@@ -241,11 +241,11 @@ func (sfh *SFile) Read(ctx context.Context, req *fuse.ReadRequest, resp *fuse.Re
 	sfh.file.Seek(req.Offset, 0)
 	n, err := sfh.file.Read(buf)
 	if err == io.ErrUnexpectedEOF || err == io.EOF {
-		log.Printf("IO Error %S", err)
+		log.Printf("IO Error %s\n", err)
 		err = nil
 	}
 	resp.Data = buf[:n]
-	fmt.Println("Ok copied %d", len(resp.Data))
+	fmt.Printf("Ok copied %d\n", len(resp.Data))
 	return err
 }
 
@@ -253,12 +253,12 @@ var _ = fs.HandleWriter(&SFile{})
 
 func (sf *SFile) Write(ctx context.Context, req *fuse.WriteRequest, resp *fuse.WriteResponse) error {
 	size := len(req.Data)
-	fmt.Println("Writing  bytes: %d", size)
+	fmt.Printf("Writing  bytes: %d\n", size)
 	stream := make(chan uint64, 1)
 	go sf.ioc.CheckoutWrite(uint64(size), stream)
 	checkedOut := uint64(0)
 	for c := range stream {
-		fmt.Println("Got %d more bytes", c)
+		fmt.Printf("Writing got %d more bytes\n", c)
 		checkedOut += c
 	}
 
@@ -268,7 +268,7 @@ func (sf *SFile) Write(ctx context.Context, req *fuse.WriteRequest, resp *fuse.W
 		log.Printf("Failed to write to file %s with offset %d", err, req.Offset)
 	}
 	resp.Size = n
-	fmt.Println("Wrote %d bytes", n)
+	fmt.Printf("Wrote %d bytes\n", n)
 	return err
 }
 
@@ -278,14 +278,14 @@ func (sfh *SFile) Flush(ctx context.Context, req *fuse.FlushRequest) error {
 	return sfh.file.Sync()
 }
 
-func mount(path, mountpoint string) error {
-	c, err := fuse.Mount(mountpoint)
+func mount(mountPoint string) error {
+	c, err := fuse.Mount(mountPoint)
 	if err != nil {
 		return err
 	}
 	defer c.Close()
 
-	filesys := NewSFS(path)
+	filesys := NewSFS(mountPoint)
 
 	if err := fs.Serve(c, filesys); err != nil {
 		log.Printf("Failed to server because %s", err)
