@@ -7,6 +7,7 @@ package ioc
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 )
@@ -83,7 +84,7 @@ func (ioc *IOC) Active() bool {
 // Checkout
 // TODO: Would like to eventually measure back pressure if possible
 func (ioc *IOC) Checkout(bl *ByteLimit, requested uint64, stream chan uint64) error {
-
+	fmt.Printf("Requesting checkout of %d bytes\n", requested)
 	defer close(stream)
 
 	for requested > 0 {

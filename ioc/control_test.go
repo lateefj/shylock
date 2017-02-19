@@ -7,23 +7,29 @@ import (
 
 func TestIOCCheckout(t *testing.T) {
 
-	ioc := NewIOC(100*time.Microsecond, uint64(1), uint64(1))
+	ioc := NewIOC(1*time.Nanosecond, uint64(1), uint64(1))
+	go ioc.Start()
+	defer ioc.Stop()
 	readStream := make(chan uint64, 1)
 	writeStream := make(chan uint64, 1)
-	go ioc.Start()
 	go ioc.CheckoutRead(5, readStream)
 	go ioc.CheckoutWrite(5, writeStream)
 	for i := 0; i < 5; i++ {
 		select {
-		case readBits, closed := <-readStream:
+		case readBits, open := <-readStream:
+			if !open {
+				t.Fatalf("readStream closed on run %d", i)
+			}
 			if readBits != 1 {
-				t.Fatalf("Expected 1 byte on readStream but got %d with closed channel %v", readBits, closed)
+				t.Fatalf("Run %d Expected 1 byte on readStream but got %d with open channel %v", i, readBits, open)
 			}
-			writeBits, closed := <-writeStream
+		case writeBits, open := <-writeStream:
+			if !open {
+				t.Fatalf("writeStream closed on run %d", i)
+			}
 			if writeBits != 1 {
-				t.Fatalf("Expected 1 byte on writeStream but got %d with closed channel %v", writeBits, closed)
+				t.Fatalf("Run %d expected 1 byte on writeStream but got %d with closed channel %v", i, writeBits, open)
 			}
-			break
 		case <-time.After(10 * time.Millisecond):
 			t.Fatal("Failed after 10 Microsecond")
 		}
