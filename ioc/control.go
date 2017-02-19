@@ -84,8 +84,6 @@ func (ioc *IOC) Active() bool {
 // TODO: Would like to eventually measure back pressure if possible
 func (ioc *IOC) Checkout(bl *ByteLimit, requested uint64, stream chan uint64) error {
 
-	defer close(stream)
-
 	for requested > 0 {
 		// If the io controller is still active
 		if !ioc.Active() {
