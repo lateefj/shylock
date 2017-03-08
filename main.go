@@ -3,15 +3,35 @@ package main
 import (
 	"fmt"
 	"log"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/lateefj/shylock/kafka"
 )
 
+var (
+	kafkaBrokers []string
+	kafkaTopic   string
+)
+
+func init() {
+	brokers := os.Getenv("KAFKA_BROKERS")
+	if brokers == "" {
+		kafkaBrokers = []string{"127.0.0.1:9092"}
+	} else {
+		kafkaBrokers = strings.Split(brokers, ",")
+	}
+
+	kafkaTopic = os.Getenv("KAFKA_TOPIC")
+	if kafkaTopic == "" {
+		kafkaTopic = "my_topic"
+	}
+}
+
 func testProducer() {
 
-	brokers := []string{"127.0.0.1:9092"}
-	producer, err := kafka.NewProducer(brokers, "my_topic")
+	producer, err := kafka.NewProducer(kafkaBrokers, kafkaTopic)
 	if err != nil {
 		log.Printf("ERROR: Failed to create a producer")
 		return
@@ -24,10 +44,9 @@ func testProducer() {
 }
 
 func mountKafka() {
-	brokers := []string{"127.0.0.1:9092"}
-	topics := []string{"my_topic", "other_topic"}
 
-	kc := kafka.KafkaConfig{Brokers: brokers, Topics: topics}
+	topics := []string{kafkaTopic}
+	kc := kafka.KafkaConfig{Brokers: kafkaBrokers, Topics: topics}
 	c := kafka.ClusterConfig{KafkaConfig: kc, Name: "test"}
 	consumer, err := kafka.NewConsumer(c)
 	if err != nil {
@@ -47,6 +66,7 @@ func mountKafka() {
 }
 
 func main() {
+	fmt.Printf("Kafka topic %s and brokers %s\n", kafkaTopic, kafkaBrokers)
 	go testProducer()
 	mountKafka()
 }
