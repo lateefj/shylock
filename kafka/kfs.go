@@ -3,25 +3,26 @@ package kafka
 import (
 	"errors"
 	"fmt"
+	"log"
 	"os"
 	"strings"
 	"time"
 
 	"bazil.org/fuse"
 	"bazil.org/fuse/fs"
-	"github.com/Shopify/sarama"
-	cluster "github.com/bsm/sarama-cluster"
+	"golang.org/x/net/context"
 )
 
 // This device is an example implementation of an in-memory block device
 
 type KFS struct {
-	Path string
+	Path    string
+	Brokers []string
 }
 
-func NewKFS(path string, p *sarama.Producer, c *cluster.Consuer) *KFS {
+func NewKFS(path string, brokers []string) *KFS {
 
-	&KFS{Path: path}
+	return &KFS{Path: path, Brokers: brokers}
 }
 
 var _ fs.FS = (*KFS)(nil)
@@ -32,14 +33,12 @@ func (kfs *KFS) Root() (fs.Node, error) {
 }
 
 type KDir struct {
-	KFS      *KFS
-	Path     string
-	Producer *sarama.Producer
-	Consumer *cluster.Consumer
+	KFS  *KFS
+	Path string
 }
 
 func (kd *KDir) IsRoot() bool {
-	if kd.Path == kd.SFS.Path {
+	if kd.Path == kd.KFS.Path {
 		return true
 	}
 	return false
@@ -75,18 +74,26 @@ func (kd *KDir) Lookup(ctx context.Context, req *fuse.LookupRequest, resp *fuse.
 	if isDir(path) {
 		return &KDir{Path: path, KFS: kd.KFS}, nil
 	}
-	parts = strings.Split(req.Name, "/")
+	parts := strings.Split(req.Name, "/")
 	// TODO: Validate possible paths Temporary!!!
 	if parts[len(parts)] != "reader" {
 		return nil, errors.New(fmt.Sprintf("Path %s does not exists ...", path))
 
 	}
-	f = parts[len(parts)]
-	cluster = parts[len(parts-1)]
-	topic = parts[len(parts-2)]
+	f := parts[len(parts)]
+	cluster := parts[len(parts)-1]
+	topic := parts[len(parts)-2]
 
-	return &KFile{Topic: topic, Cluster: cluster, Action: f}, nil
+	return &KFile{Brokers: kd.KFS.Brokers, Topic: topic, Cluster: cluster, Action: f}, nil
 }
+
+func (sd *KDir) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error) {
+
+	var res []fuse.Dirent
+	return res, nil
+}
+
+var _ fs.Node = (*KDir)(nil)
 
 // Register lookup callback
 var _ = fs.NodeRequestLookuper(&KDir{})
@@ -96,6 +103,7 @@ var _ = fs.NodeRequestLookuper(&KDir{})
 // cluster/ - Cluster consumer
 
 type KFile struct {
+	Brokers []string
 	Topic   string
 	Cluster string
 	Action  string
@@ -103,6 +111,9 @@ type KFile struct {
 
 var _ fs.Node = (*KFile)(nil)
 
+func (sf *KFile) Attr(ctx context.Context, a *fuse.Attr) error {
+	return nil
+}
 func (kf *KFile) Open(ctx context.Context, req *fuse.OpenRequest, resp *fuse.OpenResponse) (fs.Handle, error) {
 	return kf, nil
 }
@@ -114,17 +125,17 @@ func (kf *KFile) Release(ctx context.Context, req *fuse.ReleaseRequest) error {
 	return nil
 }
 
-var _ fs.HandleReleaser = (*SFile)(nil)
+var _ fs.HandleReleaser = (*KFile)(nil)
 
 func (kf *KFile) Read(ctx context.Context, req *fuse.ReadRequest, resp *fuse.ReadResponse) error {
 	fmt.Printf("OK woot trying to read kafka topic %s\n", kf.Cluster)
 
-	kc := kafka.KafkaConfig{Brokers: kafkaBrokers, Topics: []string{kf.Topic}}
-	c := kafka.ClusterConfig{KafkaConfig: kc, Name: kf.Cluster}
-	consumer, err := kafka.NewConsumer(c)
+	kc := KafkaConfig{Brokers: kf.Brokers, Topics: []string{kf.Topic}}
+	c := ClusterConfig{KafkaConfig: kc, Name: kf.Cluster}
+	consumer, err := NewConsumer(c)
 	if err != nil {
 		log.Printf("ERROR: Failed to connect to kafka %s\n", err)
-		return
+		return err
 	}
 
 	for {
