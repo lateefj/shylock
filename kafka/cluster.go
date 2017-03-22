@@ -1,6 +1,8 @@
 package kafka
 
 import (
+	"log"
+
 	"github.com/Shopify/sarama"
 	cluster "github.com/bsm/sarama-cluster"
 )
@@ -13,6 +15,18 @@ type KafkaConfig struct {
 type ClusterConfig struct {
 	KafkaConfig
 	Name string `json:"name"`
+}
+
+func Topics(brokers []string) ([]string, error) {
+	topics := make([]string, 0)
+	c, err := sarama.NewClient(brokers, sarama.NewConfig())
+
+	if err != nil {
+		log.Printf("ERROR: Failed to get topics %s\n", err)
+		return topics, err
+	}
+
+	return c.Topics()
 }
 
 func NewConsumer(cc ClusterConfig) (*cluster.Consumer, error) {

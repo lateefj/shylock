@@ -1,13 +1,20 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log"
 	"os"
 	"strings"
 	"time"
 
+	"bazil.org/fuse"
+	"bazil.org/fuse/fs"
 	"github.com/lateefj/shylock/kafka"
+)
+
+const (
+	progName = "skylock"
 )
 
 var (
@@ -65,8 +72,54 @@ func mountKafka() {
 
 }
 
+func mount(mountPoint string) error {
+	c, err := fuse.Mount(mountPoint)
+	if err != nil {
+		return err
+	}
+	defer c.Close()
+
+	filesys := kafka.NewKFS(mountPoint, kafkaBrokers)
+
+	if err := fs.Serve(c, filesys); err != nil {
+		log.Printf("ERROR: Failed to server because %s\n", err)
+
+		return err
+	}
+
+	// check if the mount process has an error to report
+	<-c.Ready
+	if err := c.MountError; err != nil {
+		log.Printf("ERROR: Failed to mount because %s\n", err)
+		return err
+	}
+	return nil
+
+}
+
+func usage() {
+	fmt.Fprintf(os.Stderr, "Usage of %s: shylock /path/to/thing \n", "shylock")
+	flag.PrintDefaults()
+}
 func main() {
 	fmt.Printf("Kafka topic %s and brokers %s\n", kafkaTopic, kafkaBrokers)
 	go testProducer()
-	mountKafka()
+	//mountKafka()
+
+	log.SetFlags(0)
+	log.SetPrefix(progName + ": ")
+
+	flag.Usage = usage
+	flag.Parse()
+
+	if flag.NArg() != 1 {
+		usage()
+		os.Exit(2)
+	}
+	mountPoint := flag.Arg(0)
+	log.Printf("Mount point %s\n", mountPoint)
+	if err := mount(mountPoint); err != nil {
+		log.Fatal(err)
+	}
+	mount(mountPoint)
 }
