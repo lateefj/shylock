@@ -45,7 +45,7 @@ func testProducer() {
 	}
 	for i := 0; ; i++ {
 		fmt.Printf("Sending message: %d\n", i)
-		producer.KeySend("foo", []byte(fmt.Sprintf("Test message %d", i)))
+		producer.KeySend("foo", []byte(fmt.Sprintf("Test message %d\n", i)))
 		time.Sleep(5 * time.Second)
 	}
 }

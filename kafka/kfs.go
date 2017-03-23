@@ -199,23 +199,25 @@ func (kp *KPipe) Read(ctx context.Context, req *fuse.ReadRequest, resp *fuse.Rea
 		kp.connectConsumer()
 	}
 
-	for {
-		select {
-		case m := <-kp.Consumer.Messages():
-			fmt.Printf("Message from topic %s Key %s and body is %s\n", m.Topic, string(m.Key), string(m.Value))
-			fuseutil.HandleRead(req, resp, m.Value)
-		case e := <-kp.Consumer.Errors():
-			if e != nil {
-				log.Printf("ERROR: From topic %s\n", e)
-			}
+	select {
+	case m := <-kp.Consumer.Messages():
+		fmt.Printf("Message from topic %s Key %s and body is %s\n", m.Topic, string(m.Key), string(m.Value))
+		fuseutil.HandleRead(req, resp, m.Value)
+		/*case e := <-kp.Consumer.Errors():
+		if e != nil {
+			log.Printf("ERROR: From topic %s\n", e)
 		}
+		err = e
+		*/
 	}
+	return err
 }
 
 var _ = fs.HandleReader(&KPipe{})
 
 func (kp *KPipe) Release(ctx context.Context, req *fuse.ReleaseRequest) error {
-	return kp.Consumer.Close()
+	//return kp.Consumer.Close()
+	return nil
 }
 
 var _ = fs.HandleReader(&KPipe{})
