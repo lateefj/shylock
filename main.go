@@ -40,7 +40,7 @@ func testProducer() {
 
 	producer, err := kafka.NewProducer(kafkaBrokers, kafkaTopic)
 	if err != nil {
-		log.Printf("ERROR: Failed to create a producer")
+		log.Printf("ERROR: Failed to create a producer: %s", err)
 		return
 	}
 	for i := 0; ; i++ {

@@ -81,30 +81,27 @@ func (kd *KDir) Lookup(ctx context.Context, req *fuse.LookupRequest, resp *fuse.
 
 	fmt.Printf("Doing Lookup for path %s\n", path)
 	bits := strings.Split(path[len(kd.KFS.Path):], "/")
-	fmt.Printf("Bits are %v\n", bits)
 	if isDir(path) {
 		fmt.Printf("Returning directory!\n")
 		return &KDir{Path: path, KFS: kd.KFS}, nil
 	}
 	parts := make([]string, 0)
 	for _, p := range bits {
-		fmt.Printf("Part is %s\n", p)
 		if p != "" {
 			parts = append(parts, p)
 		}
 	}
-	fmt.Printf("Parts are %v\n", parts)
+	fmt.Printf("Parts are size %d and values %v\n", len(parts), parts)
 	// TODO: Validate possible paths Temporary!!!
 	if len(parts) > 0 {
 		topic := parts[0]
 		if len(parts) > 1 {
-			cluster := parts[len(parts)-1]
-			reader := parts[len(parts)-2]
+			cluster := parts[len(parts)-2]
+			reader := parts[len(parts)-1]
+
+			fmt.Printf("Cluster %s and topic %s and action %s\n", cluster, topic, req.Name)
 			if reader == "reader" {
-				fmt.Printf("Cluster %s and topic %s and action %s\n", cluster, topic, req.Name)
-				kp := &KPipe{Brokers: kd.KFS.Brokers, Topic: topic, Cluster: cluster, Action: req.Name}
-				kp.connectConsumer()
-				return kp, nil
+				return &KPipe{Brokers: kd.KFS.Brokers, Topic: topic, Cluster: cluster, Action: req.Name}, nil
 			}
 		}
 	}
@@ -119,7 +116,8 @@ var _ fs.NodeRequestLookuper = (*KDir)(nil)
 func (kd *KDir) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error) {
 
 	fmt.Printf("ReadDirAll path is %s\n", kd.Path)
-	p := kd.Path[len(kd.KFS.Path):]
+	start := strings.Split(kd.Path[len(kd.KFS.Path)+1:], "/")
+	p := start[0]
 	fmt.Printf("p is %s\n", p)
 	topics, err := Topics(kd.KFS.Brokers)
 	var res []fuse.Dirent
@@ -131,12 +129,8 @@ func (kd *KDir) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error) {
 		if t == p {
 			var reader fuse.Dirent
 			reader.Name = "reader"
-			reader.Type = fuse.DT_Dir
+			reader.Type = fuse.DT_FIFO
 			res = append(res, reader)
-			var bar fuse.Dirent
-			bar.Name = "bar"
-			bar.Type = fuse.DT_Char
-			res = append(res, bar)
 			return res, nil
 		}
 	}
@@ -166,14 +160,14 @@ type KPipe struct {
 	Consumer *cluster.Consumer
 }
 
-func (kp KPipe) Attr(ctx context.Context, a *fuse.Attr) error {
-	a.Mode = os.ModeNamedPipe | 0666
+func (kp *KPipe) Attr(ctx context.Context, a *fuse.Attr) error {
+	//a.Mode = os.ModeNamedPipe | 0666
 	return nil
 }
 
 var _ fs.Node = (*KPipe)(nil)
 
-func (kp KPipe) connectConsumer() error {
+func (kp *KPipe) connectConsumer() error {
 	if kp.Consumer != nil {
 		return nil
 	}
@@ -190,31 +184,48 @@ func (kp KPipe) connectConsumer() error {
 	return nil
 }
 
-func (kp KPipe) Open(ctx context.Context, req *fuse.OpenRequest, resp *fuse.OpenResponse) (fs.Handle, error) {
+func (kp *KPipe) Open(ctx context.Context, req *fuse.OpenRequest, resp *fuse.OpenResponse) (fs.Handle, error) {
 	err := kp.connectConsumer()
-	resp.Flags |= fuse.OpenNonSeekable
-	return &kp, err
+	resp.Flags |= fuse.OpenDirectIO
+	return kp, err
 }
 
 var _ = fs.NodeOpener(&KPipe{})
 
-func (kp KPipe) Read(ctx context.Context, req *fuse.ReadRequest, resp *fuse.ReadResponse) error {
+func (kp *KPipe) Read(ctx context.Context, req *fuse.ReadRequest, resp *fuse.ReadResponse) error {
 	var err error
 	fmt.Printf("OK woot trying to read kafka topic %s\n", kp.Cluster)
 	if kp.Consumer == nil {
+		kp.connectConsumer()
 	}
 
-	select {
-	case m := <-kp.Consumer.Messages():
-		fmt.Printf("Message from topic %s Key %s and body is %s\n", m.Topic, string(m.Key), string(m.Value))
-		fuseutil.HandleRead(req, resp, m.Value)
-
-		return nil
-	case e := <-kp.Consumer.Errors():
-		log.Printf("ERROR: From topic %s\n", e)
-		return err
+	for {
+		select {
+		case m := <-kp.Consumer.Messages():
+			fmt.Printf("Message from topic %s Key %s and body is %s\n", m.Topic, string(m.Key), string(m.Value))
+			fuseutil.HandleRead(req, resp, m.Value)
+		case e := <-kp.Consumer.Errors():
+			if e != nil {
+				log.Printf("ERROR: From topic %s\n", e)
+			}
+		}
 	}
 }
+
+var _ = fs.HandleReader(&KPipe{})
+
+func (kp *KPipe) Release(ctx context.Context, req *fuse.ReleaseRequest) error {
+	return kp.Consumer.Close()
+}
+
+var _ = fs.HandleReader(&KPipe{})
+
+func (kp *KPipe) Create(ctx context.Context, req *fuse.CreateRequest, resp *fuse.CreateResponse) (fs.Node, fs.Handle, error) {
+	fmt.Printf("Creating a new file %s\n", req.Name)
+	return kp, kp, nil
+}
+
+var _ = fs.NodeCreater(&KPipe{})
 
 /*
 type KFile struct {
