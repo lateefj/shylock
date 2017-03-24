@@ -9,7 +9,6 @@ import (
 
 	"bazil.org/fuse"
 	"bazil.org/fuse/fs"
-	"bazil.org/fuse/fuseutil"
 	cluster "github.com/bsm/sarama-cluster"
 	"golang.org/x/net/context"
 )
@@ -200,9 +199,13 @@ func (kp *KPipe) Read(ctx context.Context, req *fuse.ReadRequest, resp *fuse.Rea
 	}
 
 	select {
-	case m := <-kp.Consumer.Messages():
-		fmt.Printf("Message from topic %s Key %s and body is %s\n", m.Topic, string(m.Key), string(m.Value))
-		fuseutil.HandleRead(req, resp, m.Value)
+	case m, more := <-kp.Consumer.Messages():
+		if more {
+			data := m.Value
+			fmt.Printf("Message from topic %s partition: %d Key %s and body is %s\n", m.Topic, m.Partition, string(m.Key), string(data))
+			resp.Data = data
+			kp.Consumer.MarkOffset(m, "")
+		}
 		/*case e := <-kp.Consumer.Errors():
 		if e != nil {
 			log.Printf("ERROR: From topic %s\n", e)
