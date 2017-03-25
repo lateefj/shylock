@@ -1,4 +1,4 @@
-package main
+package pathioc
 
 import (
 	"fmt"
@@ -10,6 +10,7 @@ import (
 
 	"bazil.org/fuse"
 	"bazil.org/fuse/fs"
+	"github.com/lateefj/shylock/ioc"
 	"golang.org/x/net/context"
 )
 
@@ -25,12 +26,12 @@ func fileAttr(fi os.FileInfo, a *fuse.Attr) {
 // SFS Shylock File System
 type SFS struct {
 	Path string
-	IOC  *IOC
+	IOC  *ioc.IOC
 }
 
 func NewSFS(path string) *SFS {
 	//TODO: Read from configuration file
-	ioc := NewIOC(10*time.Second, uint64(1000), uint64(5))
+	ioc := ioc.NewIOC(10*time.Second, uint64(1000), uint64(5))
 	go ioc.Start()
 	return &SFS{Path: path, IOC: ioc}
 }
@@ -42,7 +43,7 @@ func (sfs *SFS) Root() (fs.Node, error) {
 
 type SDir struct {
 	SFS  *SFS
-	IOC  *IOC
+	IOC  *ioc.IOC
 	Path string
 }
 
@@ -171,7 +172,7 @@ var _ = fs.NodeCreater(&SDir{})
 
 type SFile struct {
 	Path string
-	ioc  *IOC
+	ioc  *ioc.IOC
 	file *os.File
 }
 
@@ -278,7 +279,7 @@ func (sfh *SFile) Flush(ctx context.Context, req *fuse.FlushRequest) error {
 	return sfh.file.Sync()
 }
 
-func mount(mountPoint string) error {
+func Mount(mountPoint string) error {
 	c, err := fuse.Mount(mountPoint)
 	if err != nil {
 		return err

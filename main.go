@@ -11,6 +11,7 @@ import (
 	"bazil.org/fuse"
 	"bazil.org/fuse/fs"
 	"github.com/lateefj/shylock/kafka"
+	"github.com/lateefj/shylock/pathioc"
 )
 
 const (
@@ -98,7 +99,7 @@ func mount(mountPoint string) error {
 }
 
 func usage() {
-	fmt.Fprintf(os.Stderr, "Usage of %s: shylock /path/to/thing \n", "shylock")
+	fmt.Fprintf(os.Stderr, "Usage of %s: shylock type /path/to/thing \n", "shylock")
 	flag.PrintDefaults()
 }
 func main() {
@@ -112,14 +113,22 @@ func main() {
 	flag.Usage = usage
 	flag.Parse()
 
-	if flag.NArg() != 1 {
+	if flag.NArg() != 2 {
 		usage()
 		os.Exit(2)
 	}
-	mountPoint := flag.Arg(0)
+	mountType := flag.Arg(0)
+	mountPoint := flag.Arg(1)
 	log.Printf("Mount point %s\n", mountPoint)
 	if err := mount(mountPoint); err != nil {
 		log.Fatal(err)
 	}
-	mount(mountPoint)
+	switch mountType {
+	case "path":
+		pathioc.Mount(mountPoint)
+	case "kafka":
+		mount(mountPoint)
+	default:
+		log.Fatal("usage: shylock type /mnt/point (types: path|kafka)")
+	}
 }
