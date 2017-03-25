@@ -1,6 +1,7 @@
 package kafka
 
 import (
+	"fmt"
 	"log"
 
 	"github.com/Shopify/sarama"
@@ -56,7 +57,11 @@ func NewProducer(brokers []string, topic string) (*Producer, error) {
 
 func (p *Producer) Send(bits []byte) {
 	p.client.Input() <- &sarama.ProducerMessage{Topic: p.topic, Key: nil, Value: sarama.ByteEncoder(bits)}
+	fmt.Printf("Topic %s Sent %s\n", p.topic, string(bits))
 }
 func (p *Producer) KeySend(key string, bits []byte) {
 	p.client.Input() <- &sarama.ProducerMessage{Topic: p.topic, Key: sarama.StringEncoder(key), Value: sarama.ByteEncoder(bits)}
+}
+func (p *Producer) Close() error {
+	return p.client.Close()
 }

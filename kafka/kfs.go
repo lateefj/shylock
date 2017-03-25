@@ -100,8 +100,9 @@ func (kd *KDir) Lookup(ctx context.Context, req *fuse.LookupRequest, resp *fuse.
 			reader := parts[len(parts)-1]
 
 			fmt.Printf("Cluster %s and topic %s and action %s\n", cluster, topic, req.Name)
-			if reader == "reader" || reader == "errors" {
-				return &KPipe{Brokers: kd.KFS.Brokers, Topic: topic, Cluster: cluster, FileName: req.Name}, nil
+			//XXX: Uhg this is so bad! FIX ME !!
+			if reader == "reader" || reader == "errors" || reader == "writer" || reader == "messages" {
+				return &ClusterPipe{Brokers: kd.KFS.Brokers, Topic: topic, Cluster: cluster, FileName: req.Name}, nil
 			}
 		}
 	}
@@ -131,6 +132,18 @@ func (kd *KDir) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error) {
 			reader.Name = "reader"
 			reader.Type = fuse.DT_FIFO
 			res = append(res, reader)
+			var messages fuse.Dirent
+			messages.Name = "messages"
+			messages.Type = fuse.DT_FIFO
+			res = append(res, messages)
+			var errors fuse.Dirent
+			errors.Name = "errors"
+			errors.Type = fuse.DT_FIFO
+			res = append(res, errors)
+			var writer fuse.Dirent
+			writer.Name = "writer"
+			writer.Type = fuse.DT_FIFO
+			res = append(res, writer)
 			return res, nil
 		}
 	}
@@ -152,26 +165,27 @@ var _ fs.HandleReadDirAller = (*KDir)(nil)
 // partitions/ - List of the partitions
 // cluster/ - Cluster consumer
 
-type KPipe struct {
+type ClusterPipe struct {
 	Brokers  []string
 	Topic    string
 	Cluster  string
-	Consumer *cluster.Consumer
 	FileName string
+	Consumer *cluster.Consumer
+	Producer *Producer
 }
 
-func (kp *KPipe) Attr(ctx context.Context, a *fuse.Attr) error {
+func (kp *ClusterPipe) Attr(ctx context.Context, a *fuse.Attr) error {
 	//a.Mode = os.ModeNamedPipe | 0666
+	//a.Mode = os.ModeAppend | 0666
 	return nil
 }
 
-var _ fs.Node = (*KPipe)(nil)
+var _ fs.Node = (*ClusterPipe)(nil)
 
-func (kp *KPipe) connectConsumer() error {
+func (kp *ClusterPipe) connectConsumer() error {
 	if kp.Consumer != nil {
 		return nil
 	}
-
 	fmt.Printf("OK open being topic %s cluster %s with FileName %s\n", kp.Topic, kp.Cluster, kp.FileName)
 	kc := KafkaConfig{Brokers: kp.Brokers, Topics: []string{kp.Topic}}
 	c := ClusterConfig{KafkaConfig: kc, Name: kp.Cluster}
@@ -184,27 +198,62 @@ func (kp *KPipe) connectConsumer() error {
 	return nil
 }
 
-func (kp *KPipe) Open(ctx context.Context, req *fuse.OpenRequest, resp *fuse.OpenResponse) (fs.Handle, error) {
-	err := kp.connectConsumer()
-	resp.Flags |= fuse.OpenDirectIO
-	return kp, err
+func (kp *ClusterPipe) connectProducer() error {
+	if kp.Producer != nil {
+		return nil
+	}
+	var err error
+	kp.Producer, err = NewProducer(kafkaBrokers, kp.Topic)
+	if err != nil {
+		log.Printf("ERROR: Failed to create a producer: %s", err)
+		return err
+	}
+	return nil
 }
 
-var _ = fs.NodeOpener(&KPipe{})
+func (kp *ClusterPipe) Open(ctx context.Context, req *fuse.OpenRequest, resp *fuse.OpenResponse) (fs.Handle, error) {
+	resp.Flags |= fuse.OpenDirectIO
+	return kp, nil
+}
+
+var _ = fs.NodeOpener(&ClusterPipe{})
+
+func (kp *ClusterPipe) Release(ctx context.Context, req *fuse.ReleaseRequest) error {
+	var err error
+	if kp.Consumer != nil {
+		err = kp.Consumer.Close()
+		kp.Consumer = nil
+	}
+	if kp.Producer != nil {
+		err = kp.Producer.Close()
+		kp.Producer = nil
+	}
+	return err
+}
+
+func (kp *ClusterPipe) Create(ctx context.Context, req *fuse.CreateRequest, resp *fuse.CreateResponse) (fs.Node, fs.Handle, error) {
+	fmt.Printf("Creating a new file %s\n", req.Name)
+	return kp, kp, nil
+}
+
+var _ = fs.NodeCreater(&ClusterPipe{})
 
 // This provides 3 reading reading strategies for the cluster.
 // reader - This is just writing raw messages out
 // messages - provides binary provides a single bit
-func (kp *KPipe) Read(ctx context.Context, req *fuse.ReadRequest, resp *fuse.ReadResponse) error {
+// errors - stream of error messages
+func (kp *ClusterPipe) Read(ctx context.Context, req *fuse.ReadRequest, resp *fuse.ReadResponse) error {
 	var err error
 	if kp.Consumer == nil {
 		kp.connectConsumer()
 	}
+	fmt.Printf("Read happening \n")
 	buf := new(bytes.Buffer)
 	switch kp.FileName {
 	case "reader":
 		m, more := <-kp.Consumer.Messages()
 		if more {
+			fmt.Printf("Trying to read messages value %s\n", string(m.Value))
 			buf.Write(m.Value)
 			//TODO: Implement batch / duration commits
 			kp.Consumer.MarkOffset(m, "")
@@ -229,26 +278,26 @@ func (kp *KPipe) Read(ctx context.Context, req *fuse.ReadRequest, resp *fuse.Rea
 	return err
 }
 
-var _ = fs.HandleReader(&KPipe{})
+var _ = fs.HandleReader(&ClusterPipe{})
 
-func (kp *KPipe) Release(ctx context.Context, req *fuse.ReleaseRequest) error {
-	return kp.Consumer.Close()
+func (kp *ClusterPipe) Write(ctx context.Context, req *fuse.WriteRequest, resp *fuse.WriteResponse) error {
+	fmt.Printf("Trying to write to file %s\n", kp.FileName)
+	fmt.Printf("Writing data %s\n", string(req.Data))
+	if kp.Producer == nil {
+		kp.connectProducer()
+	}
+	// TODO: Figure out how to do a KeySend
+	kp.Producer.Send(req.Data)
+	return nil
 }
 
-var _ = fs.HandleReader(&KPipe{})
-
-func (kp *KPipe) Create(ctx context.Context, req *fuse.CreateRequest, resp *fuse.CreateResponse) (fs.Node, fs.Handle, error) {
-	fmt.Printf("Creating a new file %s\n", req.Name)
-	return kp, kp, nil
-}
-
-var _ = fs.NodeCreater(&KPipe{})
+var _ = fs.HandleWriter(&ClusterPipe{})
 
 var (
 	kafkaBrokers   []string
 	kafkaTopic     string
 	autoCommitSize int
-	autoCommitTime time.Duration
+	autoCommitTime *time.Duration
 )
 
 func testProducer() {
@@ -282,16 +331,19 @@ func init() {
 	if autoCommitDuration == "" {
 		autoCommitTime = nil
 	} else {
-		err := strconv.Aoi(autoCommitDuration)
+		t, err := strconv.Atoi(autoCommitDuration)
 		if err != nil {
 			log.Fatalf("Unable to parse KAFKA_AUTOCOMMIT_DURATION Milliseconds %s\n", autoCommitDuration)
 		}
+		d := time.Duration(t) * time.Millisecond
+		autoCommitTime = &d
 	}
+	var err error
 	autoCommitBatch := os.Getenv("KAFKA_AUTOCOMMIT_BATCH")
 	if autoCommitBatch == "" {
 		autoCommitSize = -1
 	} else {
-		err := strconv.Aoi(autoCommitBatch)
+		autoCommitSize, err = strconv.Atoi(autoCommitBatch)
 		if err != nil {
 			log.Fatalf("Unable to parse KAFKA_AUTOCOMMIT_BATCH size %s\n", autoCommitBatch)
 		}
@@ -300,7 +352,7 @@ func init() {
 
 func Mount(mountPoint string) error {
 	fmt.Printf("Kafka topic %s and brokers %s\n", kafkaTopic, kafkaBrokers)
-	go testProducer()
+	//go testProducer()
 	c, err := fuse.Mount(mountPoint)
 	if err != nil {
 		return err
