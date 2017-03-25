@@ -1,9 +1,12 @@
 package kafka
 
 import (
+	"bytes"
+	"encoding/binary"
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -189,25 +192,40 @@ func (kp *KPipe) Open(ctx context.Context, req *fuse.OpenRequest, resp *fuse.Ope
 
 var _ = fs.NodeOpener(&KPipe{})
 
+// This provides 3 reading reading strategies for the cluster.
+// reader - This is just writing raw messages out
+// messages - provides binary provides a single bit
 func (kp *KPipe) Read(ctx context.Context, req *fuse.ReadRequest, resp *fuse.ReadResponse) error {
 	var err error
 	if kp.Consumer == nil {
 		kp.connectConsumer()
 	}
+	buf := new(bytes.Buffer)
 	switch kp.FileName {
 	case "reader":
 		m, more := <-kp.Consumer.Messages()
 		if more {
-			resp.Data = m.Value
+			buf.Write(m.Value)
+			//TODO: Implement batch / duration commits
 			kp.Consumer.MarkOffset(m, "")
 		}
+	case "messages":
+		m, more := <-kp.Consumer.Messages()
+		if more {
+			err = binary.Write(buf, binary.LittleEndian, len(m.Value))
+			buf.Write(m.Value)
+			//TODO: Implement batch / duration commits
+			kp.Consumer.MarkOffset(m, "")
+		}
+
 	case "errors":
 		err = <-kp.Consumer.Errors()
 		if err != nil {
 			log.Printf("ERROR: From topic %s\n", err)
-			resp.Data = []byte(err.Error())
+			buf.WriteString(err.Error())
 		}
 	}
+	resp.Data = buf.Bytes()
 	return err
 }
 
@@ -227,8 +245,10 @@ func (kp *KPipe) Create(ctx context.Context, req *fuse.CreateRequest, resp *fuse
 var _ = fs.NodeCreater(&KPipe{})
 
 var (
-	kafkaBrokers []string
-	kafkaTopic   string
+	kafkaBrokers   []string
+	kafkaTopic     string
+	autoCommitSize int
+	autoCommitTime time.Duration
 )
 
 func testProducer() {
@@ -257,6 +277,25 @@ func init() {
 	if kafkaTopic == "" {
 		kafkaTopic = "my_topic"
 	}
+
+	autoCommitDuration := os.Getenv("KAFKA_AUTOCOMMIT_DURATION")
+	if autoCommitDuration == "" {
+		autoCommitTime = nil
+	} else {
+		err := strconv.Aoi(autoCommitDuration)
+		if err != nil {
+			log.Fatalf("Unable to parse KAFKA_AUTOCOMMIT_DURATION Milliseconds %s\n", autoCommitDuration)
+		}
+	}
+	autoCommitBatch := os.Getenv("KAFKA_AUTOCOMMIT_BATCH")
+	if autoCommitBatch == "" {
+		autoCommitSize = -1
+	} else {
+		err := strconv.Aoi(autoCommitBatch)
+		if err != nil {
+			log.Fatalf("Unable to parse KAFKA_AUTOCOMMIT_BATCH size %s\n", autoCommitBatch)
+		}
+	}
 }
 
 func Mount(mountPoint string) error {
@@ -272,7 +311,6 @@ func Mount(mountPoint string) error {
 
 	if err := fs.Serve(c, filesys); err != nil {
 		log.Printf("ERROR: Failed to server because %s\n", err)
-
 		return err
 	}
 
