@@ -5,11 +5,7 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"strings"
-	"time"
 
-	"bazil.org/fuse"
-	"bazil.org/fuse/fs"
 	"github.com/lateefj/shylock/kafka"
 	"github.com/lateefj/shylock/pathioc"
 )
@@ -18,94 +14,11 @@ const (
 	progName = "skylock"
 )
 
-var (
-	kafkaBrokers []string
-	kafkaTopic   string
-)
-
-func init() {
-	brokers := os.Getenv("KAFKA_BROKERS")
-	if brokers == "" {
-		kafkaBrokers = []string{"127.0.0.1:9092"}
-	} else {
-		kafkaBrokers = strings.Split(brokers, ",")
-	}
-
-	kafkaTopic = os.Getenv("KAFKA_TOPIC")
-	if kafkaTopic == "" {
-		kafkaTopic = "my_topic"
-	}
-}
-
-func testProducer() {
-
-	producer, err := kafka.NewProducer(kafkaBrokers, kafkaTopic)
-	if err != nil {
-		log.Printf("ERROR: Failed to create a producer: %s", err)
-		return
-	}
-	for i := 0; ; i++ {
-		fmt.Printf("Sending message: %d\n", i)
-		producer.KeySend("foo", []byte(fmt.Sprintf("Test message %d\n", i)))
-		time.Sleep(2 * time.Second)
-	}
-}
-
-func mountKafka() {
-
-	topics := []string{kafkaTopic}
-	kc := kafka.KafkaConfig{Brokers: kafkaBrokers, Topics: topics}
-	c := kafka.ClusterConfig{KafkaConfig: kc, Name: "test"}
-	consumer, err := kafka.NewConsumer(c)
-	if err != nil {
-		log.Printf("ERROR: Failed to connect to kafka %s\n", err)
-		return
-	}
-
-	for {
-		select {
-		case m := <-consumer.Messages():
-			fmt.Printf("Message from topic %s Key %s and body is %s\n", m.Topic, string(m.Key), string(m.Value))
-		case e := <-consumer.Errors():
-			log.Printf("ERROR: From topic %s\n", e)
-		}
-	}
-
-}
-
-func mount(mountPoint string) error {
-	c, err := fuse.Mount(mountPoint)
-	if err != nil {
-		return err
-	}
-	defer c.Close()
-
-	filesys := kafka.NewKFS(mountPoint, kafkaBrokers)
-
-	if err := fs.Serve(c, filesys); err != nil {
-		log.Printf("ERROR: Failed to server because %s\n", err)
-
-		return err
-	}
-
-	// check if the mount process has an error to report
-	<-c.Ready
-	if err := c.MountError; err != nil {
-		log.Printf("ERROR: Failed to mount because %s\n", err)
-		return err
-	}
-	return nil
-
-}
-
 func usage() {
-	fmt.Fprintf(os.Stderr, "Usage of %s: shylock type /path/to/thing \n", "shylock")
-	flag.PrintDefaults()
+	fmt.Fprintf(os.Stderr, "usage: %s type /mnt/point (types: path|kafka)", progName)
 }
+
 func main() {
-	fmt.Printf("Kafka topic %s and brokers %s\n", kafkaTopic, kafkaBrokers)
-	go testProducer()
-	//mountKafka()
 
 	log.SetFlags(0)
 	log.SetPrefix(progName + ": ")
@@ -119,16 +32,17 @@ func main() {
 	}
 	mountType := flag.Arg(0)
 	mountPoint := flag.Arg(1)
-	log.Printf("Mount point %s\n", mountPoint)
-	if err := mount(mountPoint); err != nil {
-		log.Fatal(err)
-	}
+	log.Printf("Mount type %s point %s\n", mountType, mountPoint)
 	switch mountType {
 	case "path":
-		pathioc.Mount(mountPoint)
+		if err := pathioc.Mount(mountPoint); err != nil {
+			log.Fatal(err)
+		}
 	case "kafka":
-		mount(mountPoint)
+		if err := kafka.Mount(mountPoint); err != nil {
+			log.Fatal(err)
+		}
 	default:
-		log.Fatal("usage: shylock type /mnt/point (types: path|kafka)")
+		usage()
 	}
 }

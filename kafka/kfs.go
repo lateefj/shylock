@@ -214,8 +214,7 @@ func (kp *KPipe) Read(ctx context.Context, req *fuse.ReadRequest, resp *fuse.Rea
 var _ = fs.HandleReader(&KPipe{})
 
 func (kp *KPipe) Release(ctx context.Context, req *fuse.ReleaseRequest) error {
-	//return kp.Consumer.Close()
-	return nil
+	return kp.Consumer.Close()
 }
 
 var _ = fs.HandleReader(&KPipe{})
@@ -226,3 +225,63 @@ func (kp *KPipe) Create(ctx context.Context, req *fuse.CreateRequest, resp *fuse
 }
 
 var _ = fs.NodeCreater(&KPipe{})
+
+var (
+	kafkaBrokers []string
+	kafkaTopic   string
+)
+
+func testProducer() {
+
+	producer, err := NewProducer(kafkaBrokers, kafkaTopic)
+	if err != nil {
+		log.Printf("ERROR: Failed to create a producer: %s", err)
+		return
+	}
+	for i := 0; ; i++ {
+		fmt.Printf("Sending message: %d\n", i)
+		producer.KeySend("foo", []byte(fmt.Sprintf("Test message %d\n", i)))
+		time.Sleep(1 * time.Second)
+	}
+}
+
+func init() {
+	brokers := os.Getenv("KAFKA_BROKERS")
+	if brokers == "" {
+		kafkaBrokers = []string{"127.0.0.1:9092"}
+	} else {
+		kafkaBrokers = strings.Split(brokers, ",")
+	}
+
+	kafkaTopic = os.Getenv("KAFKA_TOPIC")
+	if kafkaTopic == "" {
+		kafkaTopic = "my_topic"
+	}
+}
+
+func Mount(mountPoint string) error {
+	fmt.Printf("Kafka topic %s and brokers %s\n", kafkaTopic, kafkaBrokers)
+	go testProducer()
+	c, err := fuse.Mount(mountPoint)
+	if err != nil {
+		return err
+	}
+	defer c.Close()
+
+	filesys := NewKFS(mountPoint, kafkaBrokers)
+
+	if err := fs.Serve(c, filesys); err != nil {
+		log.Printf("ERROR: Failed to server because %s\n", err)
+
+		return err
+	}
+
+	// check if the mount process has an error to report
+	<-c.Ready
+	if err := c.MountError; err != nil {
+		log.Printf("ERROR: Failed to mount because %s\n", err)
+		return err
+	}
+	return nil
+
+}
