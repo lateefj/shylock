@@ -58,8 +58,6 @@ func (kd *KDir) Attr(ctx context.Context, a *fuse.Attr) error {
 		return nil
 	} else {
 		a.Mode = os.ModeDir | 0755
-		//a.Mode = os.ModeNamedPipe
-		//a.Mode = os.ModeTemporary
 	}
 	kTimeAttr(a)
 	return nil
@@ -99,8 +97,8 @@ func (kd *KDir) Lookup(ctx context.Context, req *fuse.LookupRequest, resp *fuse.
 			reader := parts[len(parts)-1]
 
 			fmt.Printf("Cluster %s and topic %s and action %s\n", cluster, topic, req.Name)
-			if reader == "reader" {
-				return &KPipe{Brokers: kd.KFS.Brokers, Topic: topic, Cluster: cluster, Action: req.Name}, nil
+			if reader == "reader" || reader == "errors" {
+				return &KPipe{Brokers: kd.KFS.Brokers, Topic: topic, Cluster: cluster, FileName: req.Name}, nil
 			}
 		}
 	}
@@ -155,8 +153,8 @@ type KPipe struct {
 	Brokers  []string
 	Topic    string
 	Cluster  string
-	Action   string
 	Consumer *cluster.Consumer
+	FileName string
 }
 
 func (kp *KPipe) Attr(ctx context.Context, a *fuse.Attr) error {
@@ -171,7 +169,7 @@ func (kp *KPipe) connectConsumer() error {
 		return nil
 	}
 
-	fmt.Printf("OK open being topic %s cluster %s with action %s\n", kp.Topic, kp.Cluster, kp.Action)
+	fmt.Printf("OK open being topic %s cluster %s with FileName %s\n", kp.Topic, kp.Cluster, kp.FileName)
 	kc := KafkaConfig{Brokers: kp.Brokers, Topics: []string{kp.Topic}}
 	c := ClusterConfig{KafkaConfig: kc, Name: kp.Cluster}
 	consumer, err := NewConsumer(c)
@@ -193,25 +191,22 @@ var _ = fs.NodeOpener(&KPipe{})
 
 func (kp *KPipe) Read(ctx context.Context, req *fuse.ReadRequest, resp *fuse.ReadResponse) error {
 	var err error
-	fmt.Printf("OK woot trying to read kafka topic %s\n", kp.Cluster)
 	if kp.Consumer == nil {
 		kp.connectConsumer()
 	}
-
-	select {
-	case m, more := <-kp.Consumer.Messages():
+	switch kp.FileName {
+	case "reader":
+		m, more := <-kp.Consumer.Messages()
 		if more {
-			data := m.Value
-			fmt.Printf("Message from topic %s partition: %d Key %s and body is %s\n", m.Topic, m.Partition, string(m.Key), string(data))
-			resp.Data = data
+			resp.Data = m.Value
 			kp.Consumer.MarkOffset(m, "")
 		}
-		/*case e := <-kp.Consumer.Errors():
-		if e != nil {
-			log.Printf("ERROR: From topic %s\n", e)
+	case "errors":
+		err = <-kp.Consumer.Errors()
+		if err != nil {
+			log.Printf("ERROR: From topic %s\n", err)
+			resp.Data = []byte(err.Error())
 		}
-		err = e
-		*/
 	}
 	return err
 }
@@ -231,70 +226,3 @@ func (kp *KPipe) Create(ctx context.Context, req *fuse.CreateRequest, resp *fuse
 }
 
 var _ = fs.NodeCreater(&KPipe{})
-
-/*
-type KFile struct {
-	Brokers []string
-	Topic   string
-	Cluster string
-	Action  string
-}
-
-func (sf *KFile) Attr(ctx context.Context, a *fuse.Attr) error {
-	t := time.Now()
-	a.Mtime = t
-	a.Ctime = t
-	a.Crtime = t
-	a.Mode = os.ModeNamedPipe | 0755
-	//a.Size = 512
-	return nil
-}
-
-var _ fs.Node = (*KFile)(nil)
-
-func (kf *KFile) Open(ctx context.Context, req *fuse.OpenRequest, resp *fuse.OpenResponse) (fs.Handle, error) {
-	fmt.Printf("OK open being topic %s cluster %s with action %s\n", kf.Topic, kf.Cluster, kf.Action)
-	kc := KafkaConfig{Brokers: kf.Brokers, Topics: []string{kf.Topic}}
-	c := ClusterConfig{KafkaConfig: kc, Name: kf.Cluster}
-	consumer, err := NewConsumer(c)
-	if err != nil {
-		log.Printf("ERROR: Failed to connect to kafka %s\n", err)
-		return kf, err
-	}
-	resp.Flags |= fuse.OpenNonSeekable
-	return &KFHandler{kf, consumer}, nil
-}
-
-var _ = fs.NodeOpener(&KFile{})
-
-type KFHandler struct {
-	KFile    *KFile
-	Consumer *cluster.Consumer
-}
-
-var _ fs.Handle = (*KFHandler)(nil)
-
-func (kfh *KFHandler) Release(ctx context.Context, req *fuse.ReleaseRequest) error {
-	return kfh.Consumer.Close()
-}
-
-var _ = fs.HandleReleaser(&KFHandler{})
-
-func (kfh *KFHandler) Read(ctx context.Context, req *fuse.ReadRequest, resp *fuse.ReadResponse) error {
-	var err error
-	fmt.Printf("OK woot trying to read kafka topic %s\n", kfh.KFile.Cluster)
-
-	select {
-	case m := <-kfh.Consumer.Messages():
-		fmt.Printf("Message from topic %s Key %s and body is %s\n", m.Topic, string(m.Key), string(m.Value))
-		fuseutil.HandleRead(req, resp, m.Value)
-
-		return nil
-	case e := <-kfh.Consumer.Errors():
-		log.Printf("ERROR: From topic %s\n", e)
-		return err
-	}
-}
-
-var _ = fs.HandleReader(&KFHandler{})
-*/

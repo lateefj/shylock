@@ -25,7 +25,6 @@ func Topics(brokers []string) ([]string, error) {
 		log.Printf("ERROR: Failed to get topics %s\n", err)
 		return topics, err
 	}
-
 	return c.Topics()
 }
 
