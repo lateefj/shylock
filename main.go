@@ -15,7 +15,7 @@ const (
 )
 
 func usage() {
-	fmt.Fprintf(os.Stderr, "usage: %s type /mnt/point (types: path|kafka)", progName)
+	fmt.Fprintf(os.Stderr, "usage: %s type /mnt/point (types: alias|kafka)", progName)
 }
 
 func main() {
@@ -34,7 +34,7 @@ func main() {
 	mountPoint := flag.Arg(1)
 	log.Printf("Mount type %s point %s\n", mountType, mountPoint)
 	switch mountType {
-	case "path":
+	case "alias":
 		if err := pathioc.Mount(mountPoint); err != nil {
 			log.Fatal(err)
 		}
