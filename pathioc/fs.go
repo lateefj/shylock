@@ -1,4 +1,4 @@
-package main
+package pathioc
 
 import (
 	"fmt"
@@ -10,6 +10,7 @@ import (
 
 	"bazil.org/fuse"
 	"bazil.org/fuse/fs"
+	"github.com/lateefj/shylock/ioc"
 	"golang.org/x/net/context"
 )
 
@@ -25,12 +26,12 @@ func fileAttr(fi os.FileInfo, a *fuse.Attr) {
 // SFS Shylock File System
 type SFS struct {
 	Path string
-	IOC  *IOC
+	IOC  *ioc.IOC
 }
 
 func NewSFS(path string) *SFS {
 	//TODO: Read from configuration file
-	ioc := NewIOC(10*time.Second, uint64(1000), uint64(5))
+	ioc := ioc.NewIOC(1*time.Second, uint64(1000), uint64(10000))
 	go ioc.Start()
 	return &SFS{Path: path, IOC: ioc}
 }
@@ -42,7 +43,7 @@ func (sfs *SFS) Root() (fs.Node, error) {
 
 type SDir struct {
 	SFS  *SFS
-	IOC  *IOC
+	IOC  *ioc.IOC
 	Path string
 }
 
@@ -91,9 +92,13 @@ func isDir(path string) bool {
 	return false
 }
 func (sd *SDir) Lookup(ctx context.Context, req *fuse.LookupRequest, resp *fuse.LookupResponse) (fs.Node, error) {
+	fmt.Printf("Trying to do lookup %s\n", req.Name)
 	path := sd.Path + "/" + req.Name
+	fmt.Printf("Trying to stat file %s\n", path)
 	_, err := os.Stat(path)
+	fmt.Println("Done stat file checking if exists")
 	if os.IsNotExist(err) {
+		fmt.Printf("File does not exist\n")
 		if isDir(req.Name) {
 			return &SDir{Path: path, IOC: sd.IOC}, nil
 		} else {
@@ -161,6 +166,7 @@ func (sd *SDir) Remove(ctx context.Context, req *fuse.RemoveRequest) error {
 var _ = fs.NodeRemover(&SDir{})
 
 func (sd *SDir) Create(ctx context.Context, req *fuse.CreateRequest, resp *fuse.CreateResponse) (fs.Node, fs.Handle, error) {
+	fmt.Printf("Creating a file %s\n", req.Name)
 	path := sd.Path + "/" + req.Name
 
 	f := &SFile{Path: path, ioc: sd.IOC}
@@ -171,7 +177,7 @@ var _ = fs.NodeCreater(&SDir{})
 
 type SFile struct {
 	Path string
-	ioc  *IOC
+	ioc  *ioc.IOC
 	file *os.File
 }
 
@@ -200,12 +206,14 @@ func (sf *SFile) Attr(ctx context.Context, a *fuse.Attr) error {
 	return nil
 }
 
-var _ = fs.NodeOpener(&SFile{})
+var _ fs.Handle = (*SFile)(nil)
 
 func (sf *SFile) Open(ctx context.Context, req *fuse.OpenRequest, resp *fuse.OpenResponse) (fs.Handle, error) {
+	fmt.Printf("Trying to open file %s\n", sf.Path)
 
 	file, err := os.Open(sf.Path)
 	if os.IsNotExist(err) {
+		fmt.Println("Having to create file that doesn't exist")
 		file, err = os.Create(sf.Path)
 	}
 	if err != nil {
@@ -217,15 +225,13 @@ func (sf *SFile) Open(ctx context.Context, req *fuse.OpenRequest, resp *fuse.Ope
 	return sf, nil
 }
 
-var _ fs.Handle = (*SFile)(nil)
-
-var _ fs.HandleReleaser = (*SFile)(nil)
+var _ = fs.NodeOpener(&SFile{})
 
 func (sfh *SFile) Release(ctx context.Context, req *fuse.ReleaseRequest) error {
 	return sfh.file.Close()
 }
 
-var _ = fs.HandleReader(&SFile{})
+var _ fs.HandleReleaser = (*SFile)(nil)
 
 func (sfh *SFile) Read(ctx context.Context, req *fuse.ReadRequest, resp *fuse.ReadResponse) error {
 	fmt.Printf("Copying bytes: %d\n", req.Size)
@@ -249,7 +255,7 @@ func (sfh *SFile) Read(ctx context.Context, req *fuse.ReadRequest, resp *fuse.Re
 	return err
 }
 
-var _ = fs.HandleWriter(&SFile{})
+var _ = fs.HandleReader(&SFile{})
 
 func (sf *SFile) Write(ctx context.Context, req *fuse.WriteRequest, resp *fuse.WriteResponse) error {
 	size := len(req.Data)
@@ -257,6 +263,7 @@ func (sf *SFile) Write(ctx context.Context, req *fuse.WriteRequest, resp *fuse.W
 	stream := make(chan uint64, 1)
 	go sf.ioc.CheckoutWrite(uint64(size), stream)
 	checkedOut := uint64(0)
+	// TODO: Write the bytes as they get checkedout
 	for c := range stream {
 		fmt.Printf("Writing got %d more bytes\n", c)
 		checkedOut += c
@@ -272,20 +279,34 @@ func (sf *SFile) Write(ctx context.Context, req *fuse.WriteRequest, resp *fuse.W
 	return err
 }
 
-var _ = fs.HandleFlusher(&SFile{})
+var _ = fs.HandleWriter(&SFile{})
 
 func (sfh *SFile) Flush(ctx context.Context, req *fuse.FlushRequest) error {
 	return sfh.file.Sync()
 }
 
-func mount(mountPoint string) error {
+var _ = fs.HandleFlusher(&SFile{})
+
+var (
+	aliasPath  string
+	configFile string
+)
+
+func init() {
+	aliasPath = os.Getenv("ALIAS_PATH")
+	if aliasPath == "" {
+		log.Fatalf("ALIAS_PATH (path to the actual files) is a required environment variable")
+	}
+}
+
+func Mount(mountPoint string) error {
 	c, err := fuse.Mount(mountPoint)
 	if err != nil {
 		return err
 	}
 	defer c.Close()
 
-	filesys := NewSFS(mountPoint)
+	filesys := NewSFS(aliasPath)
 
 	if err := fs.Serve(c, filesys); err != nil {
 		log.Printf("Failed to server because %s", err)
@@ -300,5 +321,4 @@ func mount(mountPoint string) error {
 		return err
 	}
 	return nil
-
 }

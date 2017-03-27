@@ -12,9 +12,9 @@ func TestIOCCheckout(t *testing.T) {
 	defer ioc.Stop()
 	readStream := make(chan uint64, 1)
 	writeStream := make(chan uint64, 1)
+	go ioc.CheckoutRead(5, readStream)
+	go ioc.CheckoutWrite(5, writeStream)
 	for i := 0; i < 5; i++ {
-		go ioc.CheckoutRead(5, readStream)
-		go ioc.CheckoutWrite(5, writeStream)
 		select {
 		case readBits, open := <-readStream:
 			if !open {
