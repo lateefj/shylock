@@ -76,13 +76,10 @@ func isDir(path string) bool {
 var _ fs.Node = (*KDir)(nil)
 
 func (kd *KDir) Lookup(ctx context.Context, req *fuse.LookupRequest, resp *fuse.LookupResponse) (fs.Node, error) {
-	fmt.Printf("Doing Lookup for req.Name %s\n", req.Name)
 	path := kd.Path + "/" + req.Name
 
-	fmt.Printf("Doing Lookup for path %s\n", path)
 	bits := strings.Split(path[len(kd.KFS.Path):], "/")
 	if isDir(path) {
-		fmt.Printf("Returning directory!\n")
 		return &KDir{Path: path, KFS: kd.KFS}, nil
 	}
 	parts := make([]string, 0)
@@ -91,7 +88,6 @@ func (kd *KDir) Lookup(ctx context.Context, req *fuse.LookupRequest, resp *fuse.
 			parts = append(parts, p)
 		}
 	}
-	fmt.Printf("Parts are size %d and values %v\n", len(parts), parts)
 	// TODO: Validate possible paths Temporary!!!
 	if len(parts) > 0 {
 		topic := parts[0]
@@ -99,7 +95,6 @@ func (kd *KDir) Lookup(ctx context.Context, req *fuse.LookupRequest, resp *fuse.
 			cluster := parts[len(parts)-2]
 			reader := parts[len(parts)-1]
 
-			fmt.Printf("Cluster %s and topic %s and action %s\n", cluster, topic, req.Name)
 			//XXX: Uhg this is so bad! FIX ME !!
 			if reader == "reader" || reader == "errors" || reader == "writer" || reader == "messages" {
 				return &ClusterPipe{Brokers: kd.KFS.Brokers, Topic: topic, Cluster: cluster, FileName: req.Name}, nil
@@ -107,7 +102,6 @@ func (kd *KDir) Lookup(ctx context.Context, req *fuse.LookupRequest, resp *fuse.
 		}
 	}
 
-	fmt.Printf("OK now returning a directory with path %s\n", path)
 	return &KDir{Path: path, KFS: kd.KFS}, nil
 }
 
@@ -116,10 +110,8 @@ var _ fs.NodeRequestLookuper = (*KDir)(nil)
 
 func (kd *KDir) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error) {
 
-	fmt.Printf("ReadDirAll path is %s\n", kd.Path)
 	start := strings.Split(kd.Path[len(kd.KFS.Path)+1:], "/")
 	p := start[0]
-	fmt.Printf("p is %s\n", p)
 	topics, err := Topics(kd.KFS.Brokers)
 	var res []fuse.Dirent
 	if err != nil {
@@ -148,7 +140,6 @@ func (kd *KDir) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error) {
 		}
 	}
 	for _, t := range topics {
-		fmt.Printf("Getting topic %s\n", t)
 		var de fuse.Dirent
 		de.Type = fuse.DT_Dir
 		de.Name = t
@@ -186,7 +177,6 @@ func (kp *ClusterPipe) connectConsumer() error {
 	if kp.Consumer != nil {
 		return nil
 	}
-	fmt.Printf("OK open being topic %s cluster %s with FileName %s\n", kp.Topic, kp.Cluster, kp.FileName)
 	kc := KafkaConfig{Brokers: kp.Brokers, Topics: []string{kp.Topic}}
 	c := ClusterConfig{KafkaConfig: kc, Name: kp.Cluster}
 	consumer, err := NewConsumer(c)
@@ -232,7 +222,6 @@ func (kp *ClusterPipe) Release(ctx context.Context, req *fuse.ReleaseRequest) er
 }
 
 func (kp *ClusterPipe) Create(ctx context.Context, req *fuse.CreateRequest, resp *fuse.CreateResponse) (fs.Node, fs.Handle, error) {
-	fmt.Printf("Creating a new file %s\n", req.Name)
 	return kp, kp, nil
 }
 
@@ -247,13 +236,11 @@ func (kp *ClusterPipe) Read(ctx context.Context, req *fuse.ReadRequest, resp *fu
 	if kp.Consumer == nil {
 		kp.connectConsumer()
 	}
-	fmt.Printf("Read happening \n")
 	buf := new(bytes.Buffer)
 	switch kp.FileName {
 	case "reader":
 		m, more := <-kp.Consumer.Messages()
 		if more {
-			fmt.Printf("Trying to read messages value %s\n", string(m.Value))
 			buf.Write(m.Value)
 		}
 	case "messages":
@@ -277,13 +264,12 @@ func (kp *ClusterPipe) Read(ctx context.Context, req *fuse.ReadRequest, resp *fu
 var _ = fs.HandleReader(&ClusterPipe{})
 
 func (kp *ClusterPipe) Write(ctx context.Context, req *fuse.WriteRequest, resp *fuse.WriteResponse) error {
-	fmt.Printf("Trying to write to file %s\n", kp.FileName)
-	fmt.Printf("Writing data %s\n", string(req.Data))
 	if kp.Producer == nil {
 		kp.connectProducer()
 	}
 	// TODO: Figure out how to do a KeySend
 	kp.Producer.Send(req.Data)
+	resp.Size = len(req.Data)
 	return nil
 }
 
@@ -295,20 +281,6 @@ var (
 	autoCommitSize int
 	autoCommitTime *time.Duration
 )
-
-func testProducer() {
-
-	producer, err := NewProducer(kafkaBrokers, kafkaTopic)
-	if err != nil {
-		log.Printf("ERROR: Failed to create a producer: %s", err)
-		return
-	}
-	for i := 0; ; i++ {
-		fmt.Printf("Sending message: %d\n", i)
-		producer.KeySend("foo", []byte(fmt.Sprintf("Test message %d\n", i)))
-		time.Sleep(1 * time.Second)
-	}
-}
 
 func init() {
 	brokers := os.Getenv("KAFKA_BROKERS")

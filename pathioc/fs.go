@@ -53,7 +53,6 @@ func (sd *SDir) File() (*os.File, error) {
 		log.Printf("Failed in SDir.File: %s\n", err)
 	}
 	return f, err
-
 }
 
 func (sd *SDir) IsRoot() bool {
@@ -92,13 +91,9 @@ func isDir(path string) bool {
 	return false
 }
 func (sd *SDir) Lookup(ctx context.Context, req *fuse.LookupRequest, resp *fuse.LookupResponse) (fs.Node, error) {
-	fmt.Printf("Trying to do lookup %s\n", req.Name)
 	path := sd.Path + "/" + req.Name
-	fmt.Printf("Trying to stat file %s\n", path)
 	_, err := os.Stat(path)
-	fmt.Println("Done stat file checking if exists")
 	if os.IsNotExist(err) {
-		fmt.Printf("File does not exist\n")
 		if isDir(req.Name) {
 			return &SDir{Path: path, IOC: sd.IOC}, nil
 		} else {
@@ -108,12 +103,7 @@ func (sd *SDir) Lookup(ctx context.Context, req *fuse.LookupRequest, resp *fuse.
 	f, err := os.Open(path)
 	defer f.Close()
 	if err != nil && !os.IsExist(err) {
-		log.Printf("SDir lookup: File path %s does not exist :( error: %s", path, err)
 		return nil, err
-	}
-
-	if err != nil {
-		log.Printf("SDir Lookup file %s is nil error: %s", path, err)
 	}
 	stat, err := f.Stat()
 	if err != nil {
@@ -183,23 +173,29 @@ type SFile struct {
 
 var _ fs.Node = (*SFile)(nil)
 
+func (sf *SFile) openFile(flags fuse.OpenFlags) (bool, error) {
+	var err error
+	exists := true
+	if sf.file == nil {
+
+		// Open for writing if write flag is set
+		if flags == fuse.OpenWriteOnly {
+			sf.file, err = os.OpenFile(sf.Path, os.O_APPEND|os.O_WRONLY, 0600)
+		} else { // Just open for reading
+			sf.file, err = os.Open(sf.Path)
+		}
+		if os.IsNotExist(err) {
+			exists = false
+		}
+	}
+	return exists, err
+}
+
 func (sf *SFile) Attr(ctx context.Context, a *fuse.Attr) error {
-	file, err := os.Open(sf.Path)
-	defer file.Close()
-	if os.IsNotExist(err) {
-		t := time.Now()
-		a.Mtime = t
-		a.Ctime = t
-		a.Crtime = t
-		return nil
-	}
+
+	// If file exists then get stat info
+	info, err := os.Stat(sf.Path)
 	if err != nil {
-		log.Printf("Failed to open file for attr %s", err)
-		return err
-	}
-	info, err := file.Stat()
-	if err != nil {
-		log.Printf("Stat failed for file %s open attr %s", sf.Path, err)
 		return err
 	}
 	fileAttr(info, a)
@@ -209,20 +205,16 @@ func (sf *SFile) Attr(ctx context.Context, a *fuse.Attr) error {
 var _ fs.Handle = (*SFile)(nil)
 
 func (sf *SFile) Open(ctx context.Context, req *fuse.OpenRequest, resp *fuse.OpenResponse) (fs.Handle, error) {
-	fmt.Printf("Trying to open file %s\n", sf.Path)
-
-	file, err := os.Open(sf.Path)
-	if os.IsNotExist(err) {
-		fmt.Println("Having to create file that doesn't exist")
-		file, err = os.Create(sf.Path)
-	}
+	exists, err := sf.openFile(req.Flags)
 	if err != nil {
-		log.Printf("Failed to open SFile.Open %s\n", err)
 		return nil, err
 	}
-
-	sf.file = file
-	return sf, nil
+	// If new file set mods now and return
+	if !exists {
+		fmt.Println("Having to create file that doesn't exist")
+		sf.file, err = os.Create(sf.Path)
+	}
+	return sf, err
 }
 
 var _ = fs.NodeOpener(&SFile{})
@@ -234,12 +226,10 @@ func (sfh *SFile) Release(ctx context.Context, req *fuse.ReleaseRequest) error {
 var _ fs.HandleReleaser = (*SFile)(nil)
 
 func (sfh *SFile) Read(ctx context.Context, req *fuse.ReadRequest, resp *fuse.ReadResponse) error {
-	fmt.Printf("Copying bytes: %d\n", req.Size)
 	stream := make(chan uint64, 1)
 	go sfh.ioc.CheckoutRead(uint64(req.Size), stream)
 	checkedOut := uint64(0)
 	for c := range stream {
-		fmt.Printf("Reading got %d more bytes\n", c)
 		checkedOut += c
 	}
 
@@ -247,11 +237,9 @@ func (sfh *SFile) Read(ctx context.Context, req *fuse.ReadRequest, resp *fuse.Re
 	sfh.file.Seek(req.Offset, 0)
 	n, err := sfh.file.Read(buf)
 	if err == io.ErrUnexpectedEOF || err == io.EOF {
-		log.Printf("IO Error %s\n", err)
 		err = nil
 	}
 	resp.Data = buf[:n]
-	fmt.Printf("Ok copied %d\n", len(resp.Data))
 	return err
 }
 
@@ -259,23 +247,24 @@ var _ = fs.HandleReader(&SFile{})
 
 func (sf *SFile) Write(ctx context.Context, req *fuse.WriteRequest, resp *fuse.WriteResponse) error {
 	size := len(req.Data)
-	fmt.Printf("Writing  bytes: %d\n", size)
 	stream := make(chan uint64, 1)
 	go sf.ioc.CheckoutWrite(uint64(size), stream)
 	checkedOut := uint64(0)
-	// TODO: Write the bytes as they get checkedout
+	// This checks out all the bytes before wonder if there is a better way to do this?
 	for c := range stream {
-		fmt.Printf("Writing got %d more bytes\n", c)
-		checkedOut += c
+		checkedOut += c // Probably don't need this we can just checkout until the channel closes
 	}
 
-	//sf.file.Seek(req.Offset, 0)
-	n, err := sf.file.WriteAt(req.Data, req.Offset)
+	sf.file.Close()
+	f, err := os.OpenFile(sf.Path, os.O_APPEND|os.O_WRONLY, 0600)
 	if err != nil {
-		log.Printf("Failed to write to file %s with offset %d", err, req.Offset)
+		return err
+	}
+	n, err := f.WriteAt(req.Data, req.Offset)
+	if err != nil {
+		return err
 	}
 	resp.Size = n
-	fmt.Printf("Wrote %d bytes\n", n)
 	return err
 }
 
@@ -288,17 +277,14 @@ func (sfh *SFile) Flush(ctx context.Context, req *fuse.FlushRequest) error {
 var _ = fs.HandleFlusher(&SFile{})
 
 var (
-	aliasPath  string
+	iocDir     string
 	configFile string
 )
 
-func init() {
-}
-
 func Mount(mountPoint string) error {
-	aliasPath = os.Getenv("ALIAS_PATH")
-	if aliasPath == "" {
-		log.Fatalf("ALIAS_PATH (path to the actual files) is a required environment variable")
+	iocDir = os.Getenv("PATHIOC_DIR")
+	if iocDir == "" {
+		log.Fatalf("PATHIOC_DIR (path to the actual files) is a required environment variable")
 	}
 	c, err := fuse.Mount(mountPoint)
 	if err != nil {
@@ -306,7 +292,7 @@ func Mount(mountPoint string) error {
 	}
 	defer c.Close()
 
-	filesys := NewSFS(aliasPath)
+	filesys := NewSFS(iocDir)
 
 	if err := fs.Serve(c, filesys); err != nil {
 		log.Printf("Failed to server because %s", err)
@@ -317,7 +303,7 @@ func Mount(mountPoint string) error {
 	// check if the mount process has an error to report
 	<-c.Ready
 	if err := c.MountError; err != nil {
-		log.Printf("Faield to mount because %s", err)
+		log.Printf("Failed to mount because %s", err)
 		return err
 	}
 	return nil
