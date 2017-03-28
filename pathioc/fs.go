@@ -293,13 +293,13 @@ var (
 )
 
 func init() {
+}
+
+func Mount(mountPoint string) error {
 	aliasPath = os.Getenv("ALIAS_PATH")
 	if aliasPath == "" {
 		log.Fatalf("ALIAS_PATH (path to the actual files) is a required environment variable")
 	}
-}
-
-func Mount(mountPoint string) error {
 	c, err := fuse.Mount(mountPoint)
 	if err != nil {
 		return err

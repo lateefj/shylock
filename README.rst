@@ -24,6 +24,6 @@ Kafka
 
 .. code-block:: bash
 
-  sudo umount /dev/fuse; rm -f shylock; go build; sudo ./shylock kafka $HOME/mnt 
+  umount $HOME/mnt/localhost; rm -f shylock; go build; ./shylock kafka $HOME/mnt/localhost
 
 
