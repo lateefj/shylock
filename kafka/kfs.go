@@ -255,16 +255,12 @@ func (kp *ClusterPipe) Read(ctx context.Context, req *fuse.ReadRequest, resp *fu
 		if more {
 			fmt.Printf("Trying to read messages value %s\n", string(m.Value))
 			buf.Write(m.Value)
-			//TODO: Implement batch / duration commits
-			kp.Consumer.MarkOffset(m, "")
 		}
 	case "messages":
 		m, more := <-kp.Consumer.Messages()
 		if more {
 			err = binary.Write(buf, binary.LittleEndian, len(m.Value))
 			buf.Write(m.Value)
-			//TODO: Implement batch / duration commits
-			kp.Consumer.MarkOffset(m, "")
 		}
 
 	case "errors":
