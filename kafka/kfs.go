@@ -284,6 +284,7 @@ func (kp *ClusterPipe) Write(ctx context.Context, req *fuse.WriteRequest, resp *
 	}
 	// TODO: Figure out how to do a KeySend
 	kp.Producer.Send(req.Data)
+	resp.Size = len(req.Data)
 	return nil
 }
 
