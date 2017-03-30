@@ -19,6 +19,12 @@ Development Notes
 Freebsd Testing
 ---------------
 
+PathIOC 
+```````
+.. code-block:: bash
+
+  umount $HOME/mnt/a; rm -f shylock; go build; env PATHIOC_DIR=$HOME/mnt/b ./shylock pathioc $HOME/mnt/a
+
 Kafka 
 `````
 
