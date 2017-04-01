@@ -80,6 +80,14 @@ func (ioc *IOC) Active() bool {
 	return ioc.active
 }
 
+func (ioc *IOC) Update(duration time.Duration, read, write uint64) {
+	ioc.Mutex.Lock()
+	defer ioc.Mutex.Unlock()
+	ioc.duration = duration
+	ioc.readLimit.Limit = read
+	ioc.writeLimit.Limit = write
+}
+
 // Checkout
 // TODO: Would like to eventually measure back pressure if possible
 func (ioc *IOC) Checkout(bl *ByteLimit, requested uint64, stream chan uint64) error {

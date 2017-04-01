@@ -15,9 +15,11 @@ In Shakespearean time [Shylock](https://en.wikipedia.org/wiki/Shylock) common me
 Development Notes
 =================
 
-
-Freebsd Testing
----------------
+* When testing it is important to remember not keep remounting the same paths
+* Kafka defaults environment variables KAFKA_BROKERS=127.0.0.1:9092 and KAFKA_TOPIC="my_topic"
+ 
+Usage
+------
 
 PathIOC 
 ```````
@@ -25,9 +27,9 @@ PathIOC
 
   umount $HOME/mnt/a; rm -f shylock; go build; env PATHIOC_DIR=$HOME/mnt/b ./shylock pathioc $HOME/mnt/a
 
+
 Kafka 
 `````
-
 .. code-block:: bash
 
   umount $HOME/mnt/localhost; rm -f shylock; go build; ./shylock kafka $HOME/mnt/localhost

@@ -92,7 +92,7 @@ func TestIOCCheckoutStop(t *testing.T) {
 		t.Fatalf("Should not be able to read bytes stopped\n")
 	case <-writeStream:
 		t.Fatalf("Should not be able to write bytes\n")
-	case <-time.After(10 * time.Millisecond):
+	case <-time.After(1 * time.Millisecond):
 		break
 	}
 }
