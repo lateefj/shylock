@@ -1,6 +1,7 @@
 package ioc
 
 import (
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -85,5 +86,30 @@ func TestIOMapFindPath(t *testing.T) {
 	}
 	if c.duration != duration2 {
 		t.Errorf("IOC duration %v does not match expected %v\n", c.duration, duration2)
+	}
+}
+
+func TestLoadIOCConfig(t *testing.T) {
+	txt := `/foo/bar,1,1,1
+	/foo/foo,2,2,2
+	/bar/foo,3,3,3
+	/bar/bar,4,4,4`
+
+	ioMap := loadIOCConfig(strings.NewReader(txt))
+	first := ioMap.FindPath("/foo/bar")
+	if first == nil {
+		t.Fatalf("expected to find path '/foo/bar' but got nil")
+	}
+	if first.readLimit.Limit != 1 {
+		t.Errorf("Expected 1 but read limit is %d", first.readLimit.Limit)
+	}
+
+	last, exists := ioMap.Get("/bar/bar")
+	if !exists {
+		t.Fatalf("Last entry in csv file could not find key '/bar/bar'")
+	}
+
+	if last.writeLimit.Limit != 4 {
+		t.Errorf("4 is write field however %d is the limit retrieved", last.writeLimit.Limit)
 	}
 }
