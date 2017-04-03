@@ -71,17 +71,22 @@ type IOMap struct {
 }
 
 func (iom *IOMap) Add(key string, duration time.Duration, read, write uint64) {
+	c := NewIOC(duration, read, write)
+	// Clock only around the map modification
 	iom.Mutex.Lock()
-	defer iom.Mutex.Unlock()
-
-	iom.Map[key] = NewIOC(duration, read, write)
+	iom.Map[key] = c
+	iom.Mutex.Unlock()
+	go c.Start()
 }
 
 func (iom *IOMap) Remove(key string) {
+	// Locking only around map modification
 	iom.Mutex.Lock()
-	defer iom.Mutex.Unlock()
-
+	c := iom.Map[key]
 	delete(iom.Map, key)
+	iom.Mutex.Unlock()
+	// Stop the ioc
+	c.Stop()
 }
 
 func (iom *IOMap) Update(key string, duration time.Duration, read, write uint64) {
