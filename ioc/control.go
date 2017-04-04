@@ -40,13 +40,14 @@ type IOC struct {
 	writeLimit  *ByteLimit
 	resetTicker *time.Ticker
 	active      bool
+	exit        chan bool
 }
 
 func NewIOC(duration time.Duration, rLimit, wLimit uint64) *IOC {
 	readLimit := &ByteLimit{Limit: rLimit, Notifier: &sync.Cond{L: &sync.Mutex{}}, Mutex: &sync.RWMutex{}}
 	writeLimit := &ByteLimit{Limit: wLimit, Notifier: &sync.Cond{L: &sync.Mutex{}}, Mutex: &sync.RWMutex{}}
 
-	ioc := &IOC{duration: duration, Mutex: sync.RWMutex{}, readLimit: readLimit, writeLimit: writeLimit, resetTicker: time.NewTicker(duration), active: false}
+	ioc := &IOC{duration: duration, Mutex: sync.RWMutex{}, readLimit: readLimit, writeLimit: writeLimit, resetTicker: time.NewTicker(duration), active: false, exit: make(chan bool)}
 	ioc.reset()
 	return ioc
 }
@@ -63,6 +64,8 @@ func (ioc *IOC) Start() {
 		select {
 		case <-ioc.resetTicker.C:
 			ioc.reset()
+		case <-ioc.exit:
+			return
 		}
 	}
 }
@@ -71,6 +74,7 @@ func (ioc *IOC) Stop() {
 	ioc.Mutex.Lock()
 	ioc.active = false
 	ioc.Mutex.Unlock()
+	ioc.exit <- true
 	ioc.resetTicker.Stop()
 }
 
@@ -78,6 +82,14 @@ func (ioc *IOC) Active() bool {
 	ioc.Mutex.RLock()
 	defer ioc.Mutex.RUnlock()
 	return ioc.active
+}
+
+func (ioc *IOC) Update(duration time.Duration, read, write uint64) {
+	ioc.Mutex.Lock()
+	defer ioc.Mutex.Unlock()
+	ioc.duration = duration
+	ioc.readLimit.Limit = read
+	ioc.writeLimit.Limit = write
 }
 
 // Checkout

@@ -56,7 +56,11 @@ func TestIOCCheckoutStop(t *testing.T) {
 			t.Errorf("Expected write to fail before finished")
 		}
 	}()
-	go ioc.Stop()
+	time.Sleep(1 * time.Millisecond) // Allow start to happen and consume
+	ioc.Stop()
+	if ioc.Active() {
+		t.Fatalf("Expected the IOC to be shutdown but it is still active with value %v", ioc.Active())
+	}
 	for i := 0; i < 5; i++ {
 		select {
 		case _, ok := <-readStream:
@@ -75,6 +79,7 @@ func TestIOCCheckoutStop(t *testing.T) {
 			break
 		}
 	}
+
 	readStream = make(chan uint64, 1)
 	writeStream = make(chan uint64, 1)
 	go func() {
@@ -87,12 +92,13 @@ func TestIOCCheckoutStop(t *testing.T) {
 			t.Fatalf("Expected inactive state of IOC")
 		}
 	}()
+	time.Sleep(1 * time.Millisecond) // Allow checkout read / write to happen
 	select {
 	case <-readStream:
 		t.Fatalf("Should not be able to read bytes stopped\n")
 	case <-writeStream:
 		t.Fatalf("Should not be able to write bytes\n")
-	case <-time.After(10 * time.Millisecond):
+	case <-time.After(1 * time.Millisecond):
 		break
 	}
 }
