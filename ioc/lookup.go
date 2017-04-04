@@ -4,33 +4,19 @@ import (
 	"encoding/csv"
 	"io"
 	"log"
-	"os"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 )
 
-var (
-	configFile string
-	IOCMapping IOMap
-)
-
-func init() {
-	configFile = os.Getenv("IOC_FILE")
-	if configFile != "" {
-		f, err := os.Open(configFile)
-		if err != nil {
-			log.Fatalf("Failed to open configuration file %s with error: %s", configFile, err)
-		}
-		defer f.Close()
-		IOCMapping = loadIOCConfig(f)
-	}
+func NewIOMap() *IOMap {
+	return &IOMap{Map: make(map[string]*IOC), Mutex: sync.RWMutex{}}
 }
 
-func loadIOCConfig(f io.Reader) IOMap {
+func LoadIOCConfig(f io.Reader) *IOMap {
 	reader := csv.NewReader(f)
-	mapping := IOMap{Map: make(map[string]*IOC), Mutex: sync.RWMutex{}}
+	mapping := NewIOMap()
 
 	for {
 		record, err := reader.Read()
@@ -38,7 +24,7 @@ func loadIOCConfig(f io.Reader) IOMap {
 			break
 		}
 		if err != nil {
-			log.Fatalf("Error parsing csv file %s with error: %s", configFile, err)
+			log.Fatalf("Error parsing io.Reader with error: %s", err)
 		}
 
 		path := strings.TrimSpace(record[0])
@@ -59,7 +45,7 @@ func loadIOCConfig(f io.Reader) IOMap {
 			log.Fatalf("Error parsing write limit %s", writeConf)
 		}
 
-		mapping.Add(path, time.Duration(duration)*time.Microsecond, read, write)
+		mapping.Add(path, time.Duration(duration)*time.Millisecond, read, write)
 	}
 	return mapping
 

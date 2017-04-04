@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	"time"
 
 	"bazil.org/fuse"
 	"bazil.org/fuse/fs"
@@ -25,26 +24,24 @@ func fileAttr(fi os.FileInfo, a *fuse.Attr) {
 
 // SFS Shylock File System
 type SFS struct {
-	Path string
-	IOC  *ioc.IOC
+	Path  string
+	IOMap *ioc.IOMap
 }
 
-func NewSFS(path string) *SFS {
+func NewSFS(path string, iocMap *ioc.IOMap) *SFS {
 	//TODO: Read from configuration file
-	ioc := ioc.NewIOC(1*time.Second, uint64(1000), uint64(10000))
-	go ioc.Start()
-	return &SFS{Path: path, IOC: ioc}
+	return &SFS{Path: path, IOMap: iocMap}
 }
 
 func (sfs *SFS) Root() (fs.Node, error) {
-	d := &SDir{SFS: sfs, IOC: sfs.IOC, Path: sfs.Path}
+	d := &SDir{SFS: sfs, Path: sfs.Path, IOMap: sfs.IOMap}
 	return d, nil
 }
 
 type SDir struct {
-	SFS  *SFS
-	IOC  *ioc.IOC
-	Path string
+	SFS   *SFS
+	Path  string
+	IOMap *ioc.IOMap
 }
 
 func (sd *SDir) File() (*os.File, error) {
@@ -66,11 +63,12 @@ var _ fs.Node = (*SDir)(nil)
 
 func (sd *SDir) Attr(ctx context.Context, a *fuse.Attr) error {
 
-	if sd.IsRoot() {
+	if isDir(sd.Path) {
 		// root directory
 		a.Mode = os.ModeDir | 0755
 		return nil
 	}
+
 	f, err := sd.File()
 	defer f.Close()
 	if err != nil {
@@ -95,9 +93,9 @@ func (sd *SDir) Lookup(ctx context.Context, req *fuse.LookupRequest, resp *fuse.
 	_, err := os.Stat(path)
 	if os.IsNotExist(err) {
 		if isDir(req.Name) {
-			return &SDir{Path: path, IOC: sd.IOC}, nil
+			return &SDir{Path: path, IOMap: sd.IOMap}, nil
 		} else {
-			return &SFile{Path: path, ioc: sd.IOC}, nil
+			return &SFile{Path: path}, nil
 		}
 	}
 	f, err := os.Open(path)
@@ -110,9 +108,9 @@ func (sd *SDir) Lookup(ctx context.Context, req *fuse.LookupRequest, resp *fuse.
 		return nil, err
 	}
 	if stat.IsDir() {
-		return &SDir{Path: path, IOC: sd.IOC}, nil
+		return &SDir{Path: path, IOMap: sd.IOMap}, nil
 	}
-	return &SFile{Path: path, ioc: sd.IOC}, nil
+	return &SFile{Path: path, IOMap: sd.IOMap}, nil
 }
 
 // Register callback
@@ -159,16 +157,17 @@ func (sd *SDir) Create(ctx context.Context, req *fuse.CreateRequest, resp *fuse.
 	fmt.Printf("Creating a file %s\n", req.Name)
 	path := sd.Path + "/" + req.Name
 
-	f := &SFile{Path: path, ioc: sd.IOC}
+	f := &SFile{Path: path, IOMap: sd.IOMap}
 	return f, f, nil
 }
 
 var _ = fs.NodeCreater(&SDir{})
 
 type SFile struct {
-	Path string
-	ioc  *ioc.IOC
-	file *os.File
+	Path  string
+	IOMap *ioc.IOMap
+	ioc   *ioc.IOC
+	file  *os.File
 }
 
 var _ fs.Node = (*SFile)(nil)
@@ -176,6 +175,12 @@ var _ fs.Node = (*SFile)(nil)
 func (sf *SFile) openFile(flags fuse.OpenFlags) (bool, error) {
 	var err error
 	exists := true
+	if sf.ioc == nil {
+		sf.ioc = sf.IOMap.FindPath(sf.Path)
+		if sf.ioc == nil {
+			fmt.Printf("Failed to find path %s\n", sf.Path)
+		}
+	}
 	if sf.file == nil {
 
 		// Open for writing if write flag is set
@@ -226,11 +231,13 @@ func (sfh *SFile) Release(ctx context.Context, req *fuse.ReleaseRequest) error {
 var _ fs.HandleReleaser = (*SFile)(nil)
 
 func (sfh *SFile) Read(ctx context.Context, req *fuse.ReadRequest, resp *fuse.ReadResponse) error {
-	stream := make(chan uint64, 1)
-	go sfh.ioc.CheckoutRead(uint64(req.Size), stream)
-	checkedOut := uint64(0)
-	for c := range stream {
-		checkedOut += c
+	if sfh.ioc != nil {
+		stream := make(chan uint64, 1)
+		go sfh.ioc.CheckoutRead(uint64(req.Size), stream)
+		checkedOut := uint64(0)
+		for c := range stream {
+			checkedOut += c
+		}
 	}
 
 	buf := make([]byte, req.Size)
@@ -246,13 +253,15 @@ func (sfh *SFile) Read(ctx context.Context, req *fuse.ReadRequest, resp *fuse.Re
 var _ = fs.HandleReader(&SFile{})
 
 func (sf *SFile) Write(ctx context.Context, req *fuse.WriteRequest, resp *fuse.WriteResponse) error {
-	size := len(req.Data)
-	stream := make(chan uint64, 1)
-	go sf.ioc.CheckoutWrite(uint64(size), stream)
-	checkedOut := uint64(0)
-	// This checks out all the bytes before wonder if there is a better way to do this?
-	for c := range stream {
-		checkedOut += c // Probably don't need this we can just checkout until the channel closes
+	if sf.ioc != nil {
+		size := len(req.Data)
+		stream := make(chan uint64, 1)
+		go sf.ioc.CheckoutWrite(uint64(size), stream)
+		checkedOut := uint64(0)
+		// This checks out all the bytes before wonder if there is a better way to do this?
+		for c := range stream {
+			checkedOut += c // Probably don't need this we can just checkout until the channel closes
+		}
 	}
 
 	sf.file.Close()
@@ -281,7 +290,7 @@ var (
 	configFile string
 )
 
-func Mount(mountPoint string) error {
+func Mount(mountPoint string, ioMap *ioc.IOMap) error {
 	iocDir = os.Getenv("PATHIOC_DIR")
 	if iocDir == "" {
 		log.Fatalf("PATHIOC_DIR (path to the actual files) is a required environment variable")
@@ -292,7 +301,7 @@ func Mount(mountPoint string) error {
 	}
 	defer c.Close()
 
-	filesys := NewSFS(iocDir)
+	filesys := NewSFS(iocDir, ioMap)
 
 	if err := fs.Serve(c, filesys); err != nil {
 		log.Printf("Failed to server because %s", err)

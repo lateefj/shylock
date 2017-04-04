@@ -8,7 +8,7 @@ import (
 )
 
 func TestIOMapCrud(t *testing.T) {
-	iom := IOMap{Map: make(map[string]*IOC), Mutex: sync.RWMutex{}}
+	iom := NewIOMap()
 
 	key := "foo"
 	duration := 1 * time.Millisecond
@@ -90,23 +90,23 @@ func TestIOMapFindPath(t *testing.T) {
 }
 
 func TestLoadIOCConfig(t *testing.T) {
-	txt := `/foo/bar,1,1,1
-	/foo/foo,2,2,2
-	/bar/foo,3,3,3
-	/bar/bar,4,4,4`
+	txt := `/foo/bar/,1,1,1
+	/foo/foo/,2,2,2
+	/bar/foo/,3,3,3
+	/bar/bar/,4,4,4`
 
-	ioMap := loadIOCConfig(strings.NewReader(txt))
-	first := ioMap.FindPath("/foo/bar")
+	ioMap := LoadIOCConfig(strings.NewReader(txt))
+	first := ioMap.FindPath("/foo/bar/bat")
 	if first == nil {
-		t.Fatalf("expected to find path '/foo/bar' but got nil")
+		t.Fatalf("expected to find path '/foo/bar/bat' but got nil")
 	}
 	if first.readLimit.Limit != 1 {
 		t.Errorf("Expected 1 but read limit is %d", first.readLimit.Limit)
 	}
 
-	last, exists := ioMap.Get("/bar/bar")
+	last, exists := ioMap.Get("/bar/bar/")
 	if !exists {
-		t.Fatalf("Last entry in csv file could not find key '/bar/bar'")
+		t.Fatalf("Last entry in csv file could not find key '/bar/bar/'")
 	}
 
 	if last.writeLimit.Limit != 4 {
