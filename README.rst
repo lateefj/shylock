@@ -25,8 +25,15 @@ PathIOC
 ```````
 .. code-block:: bash
 
-  umount $HOME/mnt/a; rm -f shylock; go build; env PATHIOC_DIR=$HOME/mnt/b ./shylock pathioc $HOME/mnt/a
+  umount /mnt/a; rm -f shylock; go build; env IOC_FILE=/tmp/shylock.csv PATHIOC_DIR=/mnt/b ./shylock pathioc /mnt/a
 
+With this csv as an example:
+
+.. code-block:: text
+
+  /mnt/b/foo/foo/,1000,2,2
+  /mnt/b/bar/foo/,2000,3,3
+  /mnt/b/bar/bar/,3000,4,4
 
 Kafka 
 `````
