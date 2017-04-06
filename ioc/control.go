@@ -11,6 +11,7 @@ import (
 	"time"
 )
 
+// ByteLimit ... Controls how many bytes can be consumed
 type ByteLimit struct {
 	Bytes    uint64
 	Limit    uint64
@@ -18,6 +19,7 @@ type ByteLimit struct {
 	Notifier *sync.Cond
 }
 
+// Reset ... This will reset the allocation of bytes (should get run at the end of every duration)
 func (bl *ByteLimit) Reset() {
 	defer bl.Notifier.Broadcast()
 	defer bl.Mutex.Unlock()
@@ -25,6 +27,7 @@ func (bl *ByteLimit) Reset() {
 	bl.Bytes = bl.Limit
 }
 
+// Available ... Returns the amoutn of bytes that are still available
 func (bl *ByteLimit) Available() uint64 {
 	defer bl.Mutex.RUnlock()
 	bl.Mutex.RLock()
@@ -43,6 +46,7 @@ type IOC struct {
 	exit        chan bool
 }
 
+// NewIOC ... Create a new IOC
 func NewIOC(duration time.Duration, rLimit, wLimit uint64) *IOC {
 	readLimit := &ByteLimit{Limit: rLimit, Notifier: &sync.Cond{L: &sync.Mutex{}}, Mutex: &sync.RWMutex{}}
 	writeLimit := &ByteLimit{Limit: wLimit, Notifier: &sync.Cond{L: &sync.Mutex{}}, Mutex: &sync.RWMutex{}}
@@ -56,6 +60,7 @@ func (ioc *IOC) reset() {
 	ioc.writeLimit.Reset()
 }
 
+// Start ...start wil provision out bytes as needed
 func (ioc *IOC) Start() {
 	ioc.Mutex.Lock()
 	ioc.active = true
@@ -70,6 +75,7 @@ func (ioc *IOC) Start() {
 	}
 }
 
+// Stop ... This top the goroutine
 func (ioc *IOC) Stop() {
 	ioc.Mutex.Lock()
 	ioc.active = false
@@ -78,12 +84,14 @@ func (ioc *IOC) Stop() {
 	ioc.resetTicker.Stop()
 }
 
+// Active ... Check to see if there is already a goroutine running checks
 func (ioc *IOC) Active() bool {
 	ioc.Mutex.RLock()
 	defer ioc.Mutex.RUnlock()
 	return ioc.active
 }
 
+// Update ... changes duration and read
 func (ioc *IOC) Update(duration time.Duration, read, write uint64) {
 	ioc.Mutex.Lock()
 	defer ioc.Mutex.Unlock()
@@ -92,8 +100,7 @@ func (ioc *IOC) Update(duration time.Duration, read, write uint64) {
 	ioc.writeLimit.Limit = write
 }
 
-// Checkout
-// TODO: Would like to eventually measure back pressure if possible
+// Checkout ... quick way to get a stream of bytes
 func (ioc *IOC) Checkout(bl *ByteLimit, requested uint64, stream chan uint64) error {
 	defer close(stream)
 
@@ -130,9 +137,12 @@ func (ioc *IOC) Checkout(bl *ByteLimit, requested uint64, stream chan uint64) er
 	return nil
 }
 
+// CheckoutRead ... gets a read
 func (ioc *IOC) CheckoutRead(requested uint64, stream chan uint64) error {
 	return ioc.Checkout(ioc.readLimit, requested, stream)
 }
+
+// CheckoutWrite ... gets a stream ow writes
 func (ioc *IOC) CheckoutWrite(requested uint64, stream chan uint64) error {
 	return ioc.Checkout(ioc.writeLimit, requested, stream)
 }

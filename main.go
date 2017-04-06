@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 
 	"github.com/lateefj/shylock/ioc"
@@ -17,6 +18,20 @@ const (
 
 func usage() {
 	fmt.Fprintf(os.Stderr, "usage: %s type /mnt/point (types: pathioc|kafka)", progName)
+}
+
+func httpInterface(iom *ioc.IOMap) {
+	port := os.Getenv("HTTP_PORT")
+	if port == "" { // If port is not set don't start the http server
+		log.Println("Not starting http server")
+		return
+	}
+	go func() {
+		ioc.Setup(iom)
+		log.Printf("Http server on port %s\n", port)
+		log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", port), nil))
+	}()
+
 }
 
 func loadIOCConfig(configFile string) (*ioc.IOMap, error) {
@@ -53,6 +68,7 @@ func main() {
 	mountType := flag.Arg(0)
 	mountPoint := flag.Arg(1)
 	log.Printf("Mount type %s point %s\n", mountType, mountPoint)
+	httpInterface(iom)
 	switch mountType {
 	case "pathioc":
 		if err := pathioc.Mount(mountPoint, iom); err != nil {

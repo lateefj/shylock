@@ -10,10 +10,7 @@ import (
 	"time"
 )
 
-func NewIOMap() *IOMap {
-	return &IOMap{Map: make(map[string]*IOC), Mutex: sync.RWMutex{}}
-}
-
+// LoadIOCConfig ... Takes an io.Reader expecting csv file and returns a *IOMap
 func LoadIOCConfig(f io.Reader) *IOMap {
 	reader := csv.NewReader(f)
 	mapping := NewIOMap()
@@ -51,11 +48,18 @@ func LoadIOCConfig(f io.Reader) *IOMap {
 
 }
 
+// IOMap ... Mapping of key to IOC
 type IOMap struct {
 	Map   map[string]*IOC
 	Mutex sync.RWMutex
 }
 
+// NewIOMap ... Creates a new IOMap with default params
+func NewIOMap() *IOMap {
+	return &IOMap{Map: make(map[string]*IOC), Mutex: sync.RWMutex{}}
+}
+
+// Add ... Add a IOC with a specific key to the map
 func (iom *IOMap) Add(key string, duration time.Duration, read, write uint64) {
 	c := NewIOC(duration, read, write)
 	// Clock only around the map modification
@@ -65,6 +69,7 @@ func (iom *IOMap) Add(key string, duration time.Duration, read, write uint64) {
 	go c.Start()
 }
 
+// Remove ... Remove a key
 func (iom *IOMap) Remove(key string) {
 	// Locking only around map modification
 	iom.Mutex.Lock()
@@ -75,6 +80,7 @@ func (iom *IOMap) Remove(key string) {
 	c.Stop()
 }
 
+// Update ... Update existing entry
 func (iom *IOMap) Update(key string, duration time.Duration, read, write uint64) {
 	iom.Mutex.Lock()
 	defer iom.Mutex.Unlock()
@@ -83,6 +89,7 @@ func (iom *IOMap) Update(key string, duration time.Duration, read, write uint64)
 	c.Update(duration, read, write)
 }
 
+// Get ... Retrieve based on a key
 func (iom *IOMap) Get(key string) (*IOC, bool) {
 	iom.Mutex.RLock()
 	defer iom.Mutex.RUnlock()
@@ -91,6 +98,7 @@ func (iom *IOMap) Get(key string) (*IOC, bool) {
 	return c, exists
 }
 
+// FindPath ... Search the keys space for first path to match
 func (iom *IOMap) FindPath(p string) *IOC {
 	iom.Mutex.RLock()
 	defer iom.Mutex.RUnlock()

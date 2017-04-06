@@ -42,3 +42,25 @@ Kafka
   umount $HOME/mnt/localhost; rm -f shylock; go build; ./shylock kafka $HOME/mnt/localhost
 
 
+Rest API Examples
+`````````````````
+
+Create a new path configuration:
+
+.. code-block:: bash
+
+  curl -H "Content-Type: application/json" -X POST -d '{"key":"/home/lhj/mnt/b/foo/monkey/","duration":1000,"read_limit":10,"write_limit":10}' http://localhost:7070/key/home/lhj/mnt/b/foo/monkey/
+
+  curl http://localhost:7070/key/home/lhj/mnt/b/foo/monkey/
+
+  {"key":"/home/lhj/mnt/b/foo/monkey/","duration":1000,"read_limit":10,"write_limit":10}
+
+Update a configuration:
+
+.. code-block:: bash
+
+   curl -H "Content-Type: application/json" -X PUT -d '{"key":"/home/lhj/mnt/b/foo/monkey/","duration":1000,"read_limit":20,"write_limit":20}' http://localhost:7070/key/home/lhj/mnt/b/foo/monkey/
+
+   http://localhost:7070/key/home/lhj/mnt/b/foo/monkey/
+
+   {"key":"/home/lhj/mnt/b/foo/monkey/","duration":1000,"read_limit":20,"write_limit":20}
