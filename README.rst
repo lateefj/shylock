@@ -57,6 +57,8 @@ Create a new path configuration:
 
 Update a configuration:
 
+.. code-block:: bash
+
    curl -H "Content-Type: application/json" -X PUT -d '{"key":"/home/lhj/mnt/b/foo/monkey/","duration":1000,"read_limit":20,"write_limit":20}' http://localhost:7070/key/home/lhj/mnt/b/foo/monkey/
 
    http://localhost:7070/key/home/lhj/mnt/b/foo/monkey/
