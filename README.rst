@@ -21,11 +21,23 @@ Development Notes
 Usage
 ------
 
+Etcd
+````
+
+.. code-block:: bash
+
+   umount $HOME/tmp/localhost/etcd; rm -f shylock; go build; ./shylock etcd $HOME/tmp/localhost/etcd/
+
+   # Mount as read only
+   umount $HOME/tmp/localhost/etcd; rm -f shylock; go build; env ETC_READ_ONLY="true" ./shylock etcd $HOME/tmp/localhost/etcd/
+
+
+
 PathIOC 
 ```````
 .. code-block:: bash
 
-  umount /mnt/a; rm -f shylock; go build; env IOC_FILE=/tmp/shylock.csv PATHIOC_DIR=/mnt/b ./shylock pathioc /mnt/a
+  umount /mnt/a; rm -f shylock; go build; env IOC_FILE=/tmp/shylock.csv PATHIOC_DIR=/mnt/b ./shylock pathqos /mnt/a
 
 With this csv as an example:
 

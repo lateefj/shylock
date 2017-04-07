@@ -1,4 +1,4 @@
-package ioc
+package qos
 
 import (
 	"encoding/json"
@@ -70,8 +70,7 @@ func (r *Rest) addIOC(key string, req *http.Request, w http.ResponseWriter) {
 // Default ... Default handler for a mounted system
 func (r *Rest) Default(w http.ResponseWriter, req *http.Request) {
 
-	key := req.URL.Path[len("/key"):]
-	fmt.Printf("Key is %s\n", key)
+	key := req.URL.Path[len("/key/"):]
 	var ioc *IOC
 	exists := false
 	if req.Method != http.MethodPost {

@@ -1,4 +1,4 @@
-package ioc
+package qos
 
 import (
 	"bytes"
@@ -31,7 +31,7 @@ func TestHandleGetDeletePutPost(t *testing.T) {
 	rest.Default(resp, req)
 	_, exists := iom.Get(k)
 	if !exists {
-		t.Fatalf("Expected ioc to be added via rest URL")
+		t.Fatalf("Expected qos to be added via rest URL")
 	}
 	req, _ = http.NewRequest(http.MethodGet, fmt.Sprintf("/key/%s", k), nil)
 	resp = mctest.NewMockTestResponse(t)
