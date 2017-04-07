@@ -3,7 +3,7 @@
 
 // XXX: This is Proof of concept code not optimized
 
-package ioc
+package qos
 
 import (
 	"errors"

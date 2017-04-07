@@ -1,4 +1,4 @@
-package pathioc
+package pathqos
 
 import (
 	"sync"

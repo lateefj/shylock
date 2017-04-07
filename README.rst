@@ -25,7 +25,7 @@ PathIOC
 ```````
 .. code-block:: bash
 
-  umount /mnt/a; rm -f shylock; go build; env IOC_FILE=/tmp/shylock.csv PATHIOC_DIR=/mnt/b ./shylock pathioc /mnt/a
+  umount /mnt/a; rm -f shylock; go build; env IOC_FILE=/tmp/shylock.csv PATHIOC_DIR=/mnt/b ./shylock pathqos /mnt/a
 
 With this csv as an example:
 

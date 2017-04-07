@@ -1,4 +1,4 @@
-package pathioc
+package pathqos
 
 import (
 	"fmt"
@@ -9,7 +9,7 @@ import (
 
 	"bazil.org/fuse"
 	"bazil.org/fuse/fs"
-	"github.com/lateefj/shylock/ioc"
+	"github.com/lateefj/shylock/qos"
 	"golang.org/x/net/context"
 )
 
@@ -25,10 +25,10 @@ func fileAttr(fi os.FileInfo, a *fuse.Attr) {
 // SFS Shylock File System
 type SFS struct {
 	Path  string
-	IOMap *ioc.IOMap
+	IOMap *qos.IOMap
 }
 
-func NewSFS(path string, iocMap *ioc.IOMap) *SFS {
+func NewSFS(path string, iocMap *qos.IOMap) *SFS {
 	//TODO: Read from configuration file
 	return &SFS{Path: path, IOMap: iocMap}
 }
@@ -41,7 +41,7 @@ func (sfs *SFS) Root() (fs.Node, error) {
 type SDir struct {
 	SFS   *SFS
 	Path  string
-	IOMap *ioc.IOMap
+	IOMap *qos.IOMap
 }
 
 func (sd *SDir) File() (*os.File, error) {
@@ -165,8 +165,8 @@ var _ = fs.NodeCreater(&SDir{})
 
 type SFile struct {
 	Path  string
-	IOMap *ioc.IOMap
-	ioc   *ioc.IOC
+	IOMap *qos.IOMap
+	ioc   *qos.IOC
 	file  *os.File
 }
 
@@ -290,7 +290,7 @@ var (
 	configFile string
 )
 
-func Mount(mountPoint string, ioMap *ioc.IOMap) error {
+func Mount(mountPoint string, ioMap *qos.IOMap) error {
 	iocDir = os.Getenv("PATHIOC_DIR")
 	if iocDir == "" {
 		log.Fatalf("PATHIOC_DIR (path to the actual files) is a required environment variable")
