@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/lateefj/shylock/ioc"
 	"github.com/lateefj/shylock/kafka"
-	"github.com/lateefj/shylock/pathioc"
+	"github.com/lateefj/shylock/pathqos"
+	"github.com/lateefj/shylock/qos"
 )
 
 const (
@@ -17,30 +17,30 @@ const (
 )
 
 func usage() {
-	fmt.Fprintf(os.Stderr, "usage: %s type /mnt/point (types: pathioc|kafka)", progName)
+	fmt.Fprintf(os.Stderr, "usage: %s type /mnt/point (types: pathqos|kafka)", progName)
 }
 
-func httpInterface(iom *ioc.IOMap) {
+func httpInterface(iom *qos.IOMap) {
 	port := os.Getenv("HTTP_PORT")
 	if port == "" { // If port is not set don't start the http server
 		log.Println("Not starting http server")
 		return
 	}
 	go func() {
-		ioc.Setup(iom)
+		qos.Setup(iom)
 		log.Printf("Http server on port %s\n", port)
 		log.Fatal(http.ListenAndServe(fmt.Sprintf(":%s", port), nil))
 	}()
 
 }
 
-func loadIOCConfig(configFile string) (*ioc.IOMap, error) {
+func loadIOCConfig(configFile string) (*qos.IOMap, error) {
 	f, err := os.Open(configFile)
 	if err != nil {
 		log.Fatalf("Failed to open configuration file %s with error: %s", configFile, err)
 	}
 	defer f.Close()
-	return ioc.LoadIOCConfig(f), nil
+	return qos.LoadIOCConfig(f), nil
 }
 
 func main() {
@@ -56,7 +56,7 @@ func main() {
 		os.Exit(2)
 	}
 	var err error
-	iom := ioc.NewIOMap()
+	iom := qos.NewIOMap()
 	configFile := os.Getenv("IOC_FILE")
 	if configFile != "" {
 		iom, err = loadIOCConfig(configFile)
@@ -70,8 +70,8 @@ func main() {
 	log.Printf("Mount type %s point %s\n", mountType, mountPoint)
 	httpInterface(iom)
 	switch mountType {
-	case "pathioc":
-		if err := pathioc.Mount(mountPoint, iom); err != nil {
+	case "pathqos":
+		if err := pathqos.Mount(mountPoint, iom); err != nil {
 			log.Fatal(err)
 		}
 	case "kafka":
