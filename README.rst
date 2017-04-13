@@ -2,7 +2,51 @@
 shylock
 #######
 
-Stateful Isolation Idea that provides scale down isolation for IO
+"we must treat the data center itself as one massive warehouse-scale computer" - Luiz André Barroso
+
+At the core I created shylock because I feel there is little sanity programming in a modern distributed system. Shylock basically provides two core features.
+
+#. Everything is a file (file system): key / value (object stores), message queues ect
+   #. Examples: S3, Etcd, redis pub/sub, kafka ect
+#. Quality of Service (QOS): given a key or path limit the resource based on read/write bytes or operations
+   #. Example: User (/mnt/lhj) can only write 1024K per second, read 512K per second
+
+This would not be possible if it wasn't for the great work done by the `bazil/fuse <https://bazil.org/fuse/>`_ project. By making writing a `fuse <https://github.com/libfuse/libfuse>`_ file system in Go amazingly easy I can't thank the developers enough. 
+
+Status
+======
+
+Currently shylock is in Proof of Concept (POC). The next step is to get enough integration's to be useful for users. Before an integration goes to beta status it will need:
+
+* QOS if applicable
+* Unit Tests
+* Functional Tests
+* Benchmarks
+
+Integration`s
+`````````````
+
++----------------+---------------+-----+--------+--------------------------------------------------------------------------------------------+
+| Name           | Type          | QOS | Status | Notes                                                                                      |
++----------------+---------------+-----+--------+--------------------------------------------------------------------------------------------+
+| Local Path     | File System   | Yes | POC    | Mounts a local file system directory to provide QOS                                        |
++----------------+---------------+-----+--------+--------------------------------------------------------------------------------------------+
+| Etcd           | Key Value     | No  | POC    | Low footprint distributed key value store. Basically configuration store for microservices |
++----------------+---------------+-----+--------+--------------------------------------------------------------------------------------------+
+| Kafka          | Message Queue | No  | POC    | Distributed streaming system                                                               |
++----------------+---------------+-----+--------+--------------------------------------------------------------------------------------------+
+| Redis MQ       | Message Queue | No  | Idea   | Simple Pub / Sub Message queue system                                                      |
++----------------+---------------+-----+--------+--------------------------------------------------------------------------------------------+
+| AWS S3         | Object Store  | No  | Idea   | Distribtued Object Store                                                                   |
++----------------+---------------+-----+--------+--------------------------------------------------------------------------------------------+
+| Google Storage | Object Store  | No  | Idea   | Distribtued Object Store                                                                   |
++----------------+---------------+-----+--------+--------------------------------------------------------------------------------------------+
+| AWS SQS        | Message Queue | No  | Idea   | AWS Message Queue                                                                          |
++----------------+---------------+-----+--------+--------------------------------------------------------------------------------------------+
+| Zookeeper      | Key Value     | No  | Idea   | Heavy footprint key value                                                                  |
++----------------+---------------+-----+--------+--------------------------------------------------------------------------------------------+
+| Google Drive   | Object Store  | No  | Idea   | Consumer Object Store                                                                      |
++----------------+---------------+-----+--------+--------------------------------------------------------------------------------------------+
 
 
 
@@ -15,8 +59,10 @@ In Shakespearean time [Shylock](https://en.wikipedia.org/wiki/Shylock) common me
 Development Notes
 =================
 
-* When testing it is important to remember not keep remounting the same paths
 * Kafka defaults environment variables KAFKA_BROKERS=127.0.0.1:9092 and KAFKA_TOPIC="my_topic"
+* Kafka and or Zookeeper will probably crash or heavily abuse resources don't run it always in the background
+  * Zookeeper has used up all my disk space
+  * Kafka eventually staves out my VM's without it sending or receiving any messages
  
 Usage
 ------
@@ -33,11 +79,11 @@ Etcd
 
 
 
-PathIOC 
+PathQOS 
 ```````
 .. code-block:: bash
 
-  umount /mnt/a; rm -f shylock; go build; env IOC_FILE=/tmp/shylock.csv PATHIOC_DIR=/mnt/b ./shylock pathqos /mnt/a
+  umount /mnt/a; rm -f shylock; go build; env IOC_FILE=/tmp/shylock.csv PATHQOS_DIR=/mnt/b ./shylock pathqos /mnt/a
 
 With this csv as an example:
 
