@@ -1,3 +1,6 @@
+.. highlight:: rst
+
+
 =======
 shylock
 =======
