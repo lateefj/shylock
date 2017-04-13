@@ -10,7 +10,9 @@ import (
 	"syscall"
 	"time"
 
+
 	"github.com/lateefj/shylock/etcd"
+
 	"github.com/lateefj/shylock/kafka"
 	"github.com/lateefj/shylock/pathqos"
 	"github.com/lateefj/shylock/qos"
@@ -22,6 +24,7 @@ const (
 
 func usage() {
 	fmt.Fprintf(os.Stderr, "usage: %s type /mnt/point (types: pathqos|kafka|etcd)", progName)
+
 }
 
 func httpInterface(iom *qos.IOMap) {
