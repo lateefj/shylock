@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/signal"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"bazil.org/fuse"
@@ -329,10 +331,10 @@ func Mount(mountPoint string) error {
 
 	filesys := NewKFS(mountPoint, kafkaBrokers)
 
-	if err := fs.Serve(c, filesys); err != nil {
-		log.Printf("ERROR: Failed to server because %s\n", err)
-		return err
-	}
+	fsErr := make(chan error)
+	go func() {
+		fsErr <- fs.Serve(c, filesys)
+	}()
 
 	// check if the mount process has an error to report
 	<-c.Ready
@@ -340,6 +342,19 @@ func Mount(mountPoint string) error {
 		log.Printf("ERROR: Failed to mount because %s\n", err)
 		return err
 	}
+	sigs := make(chan os.Signal)
+	signal.Notify(sigs, syscall.SIGHUP, syscall.SIGINT, syscall.SIGKILL, syscall.SIGTERM)
+
+	select {
+	case err := <-fsErr:
+		return err
+	case s := <-sigs:
+		log.Printf("Caught signal: %v", s)
+		err := c.Close()
+		log.Printf("Error: %v", err)
+		return err
+	}
+
 	return nil
 
 }

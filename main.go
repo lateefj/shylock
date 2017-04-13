@@ -6,6 +6,12 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+
+	"github.com/lateefj/shylock/etcd"
 
 	"github.com/lateefj/shylock/kafka"
 	"github.com/lateefj/shylock/pathqos"
@@ -17,7 +23,8 @@ const (
 )
 
 func usage() {
-	fmt.Fprintf(os.Stderr, "usage: %s type /mnt/point (types: pathqos|kafka)", progName)
+	fmt.Fprintf(os.Stderr, "usage: %s type /mnt/point (types: pathqos|kafka|etcd)", progName)
+
 }
 
 func httpInterface(iom *qos.IOMap) {
@@ -43,6 +50,8 @@ func loadIOCConfig(configFile string) (*qos.IOMap, error) {
 	return qos.LoadIOCConfig(f), nil
 }
 
+type exitFunc func() error
+
 func main() {
 
 	log.SetFlags(0)
@@ -65,6 +74,8 @@ func main() {
 		}
 	}
 
+	var exf exitFunc
+
 	mountType := flag.Arg(0)
 	mountPoint := flag.Arg(1)
 	log.Printf("Mount type %s point %s\n", mountType, mountPoint)
@@ -78,7 +89,35 @@ func main() {
 		if err := kafka.Mount(mountPoint); err != nil {
 			log.Fatal(err)
 		}
+	case "etcd":
+		if err := etcd.Mount(mountPoint, iom); err != nil {
+			log.Fatal(err)
+		}
+		exf = etcd.Exit
 	default:
 		usage()
+	}
+
+	sigs := make(chan os.Signal)
+	signal.Notify(sigs, syscall.SIGHUP, syscall.SIGINT, syscall.SIGKILL, syscall.SIGTERM)
+
+	select {
+	case s := <-sigs:
+		log.Printf("Caught signal: %v", s)
+		closeErrChan := make(chan error)
+		if exf != nil {
+			go func() {
+				closeErrChan <- exf()
+			}()
+		}
+		select {
+		case e := <-closeErrChan:
+			if e != nil {
+				log.Printf("Error closing %s\n", e)
+			}
+		case <-time.After(1 * time.Second):
+			log.Fatalf("FAILED Waiting for fuse mount to close\n")
+			os.Exit(1)
+		}
 	}
 }

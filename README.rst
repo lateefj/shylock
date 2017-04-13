@@ -21,6 +21,18 @@ Development Notes
 Usage
 ------
 
+Etcd
+````
+
+.. code-block:: bash
+
+   umount $HOME/tmp/localhost/etcd; rm -f shylock; go build; ./shylock etcd $HOME/tmp/localhost/etcd/
+
+   # Mount as read only
+   umount $HOME/tmp/localhost/etcd; rm -f shylock; go build; env ETC_READ_ONLY="true" ./shylock etcd $HOME/tmp/localhost/etcd/
+
+
+
 PathIOC 
 ```````
 .. code-block:: bash
