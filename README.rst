@@ -14,7 +14,7 @@ At the core I created shylock because I feel there is little sanity programming 
 This would not be possible if it wasn't for the great work done by the `bazil/fuse <https://bazil.org/fuse/>`_ project. By making writing a `fuse <https://github.com/libfuse/libfuse>`_ file system in Go amazingly easy I can't thank the developers enough. 
 
 Status
-======
+------
 
 Currently shylock is in Proof of Concept (POC). The next step is to get enough integration's to be useful for users. Before an integration goes to beta status it will need:
 
@@ -24,7 +24,7 @@ Currently shylock is in Proof of Concept (POC). The next step is to get enough i
 * Benchmarks
 
 Integration`s
-`````````````
+"""""""""""""
 
 +----------------+---------------+-----+--------+--------------------------------------------------------------------------------------------+
 | Name           | Type          | QOS | Status | Notes                                                                                      |
@@ -51,13 +51,13 @@ Integration`s
 
 
 Name
-====
+----
 
 In Shakespearean time [Shylock](https://en.wikipedia.org/wiki/Shylock) common meaning was "white hair" which I am going to ~= meaning "gray beard" in Unix. This is the inspiration for the name.
 
 
 Development Notes
-=================
+-----------------
 
 * Kafka defaults environment variables KAFKA_BROKERS=127.0.0.1:9092 and KAFKA_TOPIC="my_topic"
 * Kafka and or Zookeeper will probably crash or heavily abuse resources don't run it always in the background
