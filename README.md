@@ -4,12 +4,12 @@
 
 _"we must treat the data center itself as one massive warehouse-scale computer"_ - Luiz André Barroso
 
-At the core I created shylock because I feel there is little sanity programming in a modern distributed system. Shylock basically provides two core features.
+At the core I created shylock because I feel there is little sanity programming in a modern distributed system. To get more sanity it was going to require decoupling in some sepcific places, integrated with enough systems and provide configuration for quality of service.
 
-#. Everything is a file (file system): key / value (object stores), message queues ect
-   #. Examples: S3, Etcd, redis pub/sub, kafka ect
-#. Quality of Service (QOS): given a key or path limit the resource based on read/write bytes or operations
-   #. Example: User (/mnt/lhj) can only write 1024K per second, read 512K per second
+1. Everything is a file (file system): key / value (object stores), message queues ect
+   1. Examples: S3, Etcd, redis pub/sub, kafka ect
+1. Quality of Service (QOS): given a key or path limit the resource based on read/write bytes or operations
+   1. Example: User (/mnt/lhj) can only write 1024K per second, read 512K per second
 
 This would not be possible if it wasn't for the great work done by the `bazil/fuse <https://bazil.org/fuse/>`_ project. By making writing a `fuse <https://github.com/libfuse/libfuse>`_ file system in Go amazingly easy I can't thank the developers enough. 
 
@@ -22,7 +22,7 @@ Currently shylock is in Proof of Concept (POC). The next step is to get enough i
 * Functional Tests
 * Benchmarks
 
-### Integration`s
+### Integrated Systems
 
 | Name           | Type          | QOS | Status | Notes |
 | -------------- |:-------------:|:---:|:------:| -----:|
@@ -35,7 +35,6 @@ Currently shylock is in Proof of Concept (POC). The next step is to get enough i
 | AWS SQS        | Message Queue | No  | Idea   | AWS Message Queue  |
 | Zookeeper      | Key Value     | No  | Idea   | Heavy footprint key value |
 | Google Drive   | Object Store  | No  | Idea   | Consumer Object Store |
-
 
 
 ## Name
