@@ -2,7 +2,7 @@
 
 # shylock
 
-"we must treat the data center itself as one massive warehouse-scale computer" - Luiz André Barroso
+_"we must treat the data center itself as one massive warehouse-scale computer"_ - Luiz André Barroso
 
 At the core I created shylock because I feel there is little sanity programming in a modern distributed system. Shylock basically provides two core features.
 
