@@ -53,16 +53,17 @@ In Shakespearean time [Shylock](https://en.wikipedia.org/wiki/Shylock) common me
 
 #### Etcd
 
-  umount $HOME/tmp/localhost/etcd; rm -f shylock; go build; ./shylock etcd $HOME/tmp/localhost/etcd/
+  _Start of docs in the /docs directory_
 
-   # Mount as read only
-   umount $HOME/tmp/localhost/etcd; rm -f shylock; go build; env ETC_READ_ONLY="true" ./shylock etcd $HOME/tmp/localhost/etcd/
+  shylock etcd /mnt/localhost/etcd/
 
+  # Mount as read only
+  ETC_READ_ONLY="true" shylock etcd /mnt/localhost/etcd/
 
 
 ####  PathQOS 
 
-  umount /mnt/a; rm -f shylock; go build; env IOC_FILE=/tmp/shylock.csv PATHQOS_DIR=/mnt/b ./shylock pathqos /mnt/a
+  IOC_FILE=/tmp/shylock.csv PATHQOS_DIR=/mnt/b shylock pathqos /mnt/a
 
 With this csv as an example:
 
@@ -72,7 +73,7 @@ With this csv as an example:
 
 #### Kafka 
 
-  umount $HOME/mnt/localhost; rm -f shylock; go build; ./shylock kafka $HOME/mnt/localhost
+  shylock kafka $HOME/mnt/localhost
 
 
 ### Rest API Examples
