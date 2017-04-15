@@ -53,11 +53,12 @@ In Shakespearean time [Shylock](https://en.wikipedia.org/wiki/Shylock) common me
 
 #### Etcd
 
-  _Start of docs in the /docs directory_
+  _For more details [shylock etcd docs](docs/etcd.rst)_
 
   shylock etcd /mnt/localhost/etcd/
 
-  # Mount as read only
+  Mount as read only
+  
   ETC_READ_ONLY="true" shylock etcd /mnt/localhost/etcd/
 
 
