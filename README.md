@@ -57,7 +57,8 @@ In Shakespearean time [Shylock](https://en.wikipedia.org/wiki/Shylock) common me
 
   shylock etcd /mnt/localhost/etcd/
 
-  # Mount as read only
+  Mount as read only
+  
   ETC_READ_ONLY="true" shylock etcd /mnt/localhost/etcd/
 
 
