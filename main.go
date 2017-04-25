@@ -10,12 +10,11 @@ import (
 	"syscall"
 	"time"
 
-
 	"github.com/lateefj/shylock/etcd"
-
 	"github.com/lateefj/shylock/kafka"
 	"github.com/lateefj/shylock/pathqos"
 	"github.com/lateefj/shylock/qos"
+	"github.com/lateefj/shylock/redisfs"
 )
 
 const (
@@ -23,8 +22,7 @@ const (
 )
 
 func usage() {
-	fmt.Fprintf(os.Stderr, "usage: %s type /mnt/point (types: pathqos|kafka|etcd)", progName)
-
+	fmt.Fprintf(os.Stderr, "usage: %s type /mnt/point (types: pathqos|kafka|etcd|redis)", progName)
 }
 
 func httpInterface(iom *qos.IOMap) {
@@ -94,6 +92,11 @@ func main() {
 			log.Fatal(err)
 		}
 		exf = etcd.Exit
+	case "redis":
+		if err := redisfs.Mount(mountPoint, iom); err != nil {
+			log.Fatal(err)
+		}
+		exf = redisfs.Exit
 	default:
 		usage()
 	}
