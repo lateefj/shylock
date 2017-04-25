@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"regexp"
 	"strconv"
 	"strings"
 	"syscall"
@@ -18,13 +19,34 @@ import (
 	"golang.org/x/net/context"
 )
 
-// This device is an example implementation of an in-memory block device
+var (
+	clusterRegex = regexp.MustCompile("/(?P<topic>.*)/(?P<cluster>.*)/(?P<name>.*)")
+)
 
+func parsePath(path string) (string, string, string, error) {
+	matches := clusterRegex.FindStringSubmatch(path)
+	names := clusterRegex.SubexpNames()
+	pMap := make(map[string]string)
+	for i, match := range matches {
+		if i != 0 {
+			fmt.Println(names[i], match)
+			pMap[names[i]] = match
+		}
+	}
+	fmt.Printf("Pmap %s\n", pMap)
+	if len(pMap) != 3 {
+		return "", "", "", fmt.Errorf("Expected path wit /topic/cluster/name however could not parse this path %s", path)
+	}
+	return pMap["topic"], pMap["cluster"], pMap["name"], nil
+}
+
+// KFS ... FS root structure
 type KFS struct {
 	Path    string
 	Brokers []string
 }
 
+// NewKFS ... Create a new fs
 func NewKFS(path string, brokers []string) *KFS {
 
 	return &KFS{Path: path, Brokers: brokers}
@@ -251,7 +273,6 @@ func (kp *ClusterPipe) Read(ctx context.Context, req *fuse.ReadRequest, resp *fu
 			err = binary.Write(buf, binary.LittleEndian, len(m.Value))
 			buf.Write(m.Value)
 		}
-
 	case "errors":
 		err = <-kp.Consumer.Errors()
 		if err != nil {
