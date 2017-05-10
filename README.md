@@ -28,8 +28,8 @@ Currently shylock is in Proof of Concept (POC). The next step is to get enough i
 | -------------- |:-------------:|:---:|:------:| :---- |
 | Local Path     | File System   | Yes | POC    | Mounts a local file system directory to provide QOS |
 | Etcd           | Key Value     | No  | POC    | Low footprint distributed key value store. Basically configuration store for microservices |
+| Redis MQ       | Message Queue | No  | POC    | Simple Pub / Sub Message queue system |
 | Kafka          | Message Queue | No  | POC    | Distributed streaming system |
-| Redis MQ       | Message Queue | No  | Idea   | Simple Pub / Sub Message queue system |
 | AWS S3         | Object Store  | No  | Idea   | Distribtued Object Store |
 | Google Storage | Object Store  | No  | Idea   | Distribtued Object Store |
 | AWS SQS        | Message Queue | No  | Idea   | AWS Message Queue  |
@@ -55,16 +55,33 @@ In Shakespearean time [Shylock](https://en.wikipedia.org/wiki/Shylock) common me
 
   _For more details [shylock etcd docs](docs/etcd.rst)_
 
-  shylock etcd /mnt/localhost/etcd/
+```bash
+shylock etcd /mnt/localhost/etcd/
 
-  Mount as read only
-  
-  ETC_READ_ONLY="true" shylock etcd /mnt/localhost/etcd/
+# Mount as read only
 
+ETC_READ_ONLY="true" shylock etcd /mnt/localhost/etcd/
+```
+
+### Redis
+
+Redis currently just uses pubsub message system. This makes it very easy to broadcast messages out.
+
+```bash
+shylock redis /mnt/localhost/redis/
+```
+Environment variables with the defaults:  REDIS_HOST=localhost:6379 REDIS_PASSWORD="" REDIS_DB=0 shylock redis /mnt/localhost/redis/
+
+TODO:
+
+* Key / Value store
+* Task queue system
 
 ####  PathQOS 
 
-  IOC_FILE=/tmp/shylock.csv PATHQOS_DIR=/mnt/b shylock pathqos /mnt/a
+```bash
+IOC_FILE=/tmp/shylock.csv PATHQOS_DIR=/mnt/b shylock pathqos /mnt/a
+```
 
 With this csv as an example:
 
