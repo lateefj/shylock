@@ -1,0 +1,27 @@
+{
+  "name": "${app_name}",
+  "maintainer": "Lateef jackson <lateef@newrelic.com.com>",
+  "files": [
+    {
+      "from": "build/!arch!/!name!",
+      "to": "/usr/bin",
+      "base": "build/!arch!",
+      "fperm": "0755"
+    }
+  ],
+  "copyrights": [
+    {
+      "files": "*",
+      "copyright": "${year} Lateef Jackson <lateef@newrelic.com>",
+      "license": "BSD",
+      "file": "LICENSE"
+    }
+  ],
+  "depends": [
+    "fuse",
+    "libfuse-dev"
+  ],
+  "description": "${description}",
+  "changelog-file": "build/${package_manager}/${package_manager}_changelog"
+}
+

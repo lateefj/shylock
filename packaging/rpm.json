@@ -1,0 +1,22 @@
+{
+  "name": "${app_name}",
+  "maintainer": "Lateef jackson <lateef@newrelic.com.com>",
+  "license": "LICENSE",
+  "url": "https://github.com/lateefj/shylock",
+  "files": [
+    {
+      "from": "build/!arch!/!name!",
+      "to": "/usr/bin",
+      "base": "build/!arch!",
+      "fperm": "0755"
+    }
+  ],
+  "depends": [
+    "fuse",
+    "libfuse-dev"
+  ],
+  "description": "${description}",
+  "summary": "Quality of Service and a sane interface in a modern distributed system world",
+  "changelog-file": "build/${package_manager}/${package_manager}_changelog"
+}
+

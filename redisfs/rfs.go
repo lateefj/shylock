@@ -148,9 +148,7 @@ func (rp *RedisPipe) connect() {
 }
 
 func (rp *RedisPipe) subscribe() {
-	if rp.Client == nil {
-		rp.connect()
-	}
+	rp.connect()
 	if rp.PubSub == nil {
 		rp.PubSub = rp.Client.Subscribe(rp.Topic)
 	}
