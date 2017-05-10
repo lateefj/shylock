@@ -22,6 +22,6 @@
     "libfuse-dev"
   ],
   "description": "${description}",
-  "changelog-file": "changelog"
+  "changelog-file": "build/${package_manager}/${package_manager}_changelog"
 }
 

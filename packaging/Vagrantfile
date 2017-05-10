@@ -3,7 +3,7 @@
 
 Vagrant.configure("2") do |config|
   config.vm.box = "${distro_box}"
-  config.vm.synced_folder "../", "/${app_name}"
-  config.vm.provision "shell", path: "vm/${package_manager}_setup.sh"
+  config.vm.synced_folder "../../", "/${app_name}"
+  config.vm.provision "shell", path: "${package_manager}_setup.sh"
 end
 

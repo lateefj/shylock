@@ -1,8 +1,8 @@
 #!/bin/bash
-apt update
-apt upgrade -y
-apt install -y fuse libfuse-dev fakeroot build-essential module-assistant
-apt install -y htop sysstat make httperf wget curl git
+yum update
+yum upgrade -y
+yum install -y fuse libfuse-dev fakeroot 
+yum install -y htop sysstat make httperf wget curl git rpm-build
 
 curl https://storage.googleapis.com/golang/go1.8.1.linux-amd64.tar.gz > $$HOME/go1.8.1.linux-amd64.tar.gz
 cd $$HOME

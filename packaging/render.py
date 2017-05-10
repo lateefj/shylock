@@ -19,22 +19,20 @@ def render_file(c, src, dest):
 # Read version from file
 version = open('VERSION').read()
 
-# Base configruation
-conf = {
-        "version": version,
-        "app_name":"shylock", 
+# Base configuration
+conf = {"version": version,
+        "app_name": "shylock",
         "year": datetime.date.year,
         "description": "shylock is an attempt to bring sanity to distribute system API's that act just like a file system"
         }
 
 # deb / apt configuration
-deb = {
-        "distro_box":"ubuntu/xenial64",
-        "package_manager":"deb"
+deb = {"distro_box": "ubuntu/xenial64", "package_manager": "deb",
         }
+rpm = {"distro_box": "centos/7", "package_manager": "rpm"}
 
 # List of package managers custom configurations
-managers = [deb]
+managers = [deb, rpm]
 
 # Generate all the package manager custom files
 for pm in managers:
@@ -45,10 +43,16 @@ for pm in managers:
     build_path = 'build/{0}'.format(tmp['package_manager'])
     if not os.path.exists(build_path):
         os.makedirs(build_path)
-    # Vagrant file render  
-    render_file(tmp, 'packaging/Vagrantfile', '{0}/Vagrantfile'.format(build_path))
+    # Vagrant file render
+    render_file(tmp, 'packaging/Vagrantfile', '{0}/Vagrantfile'.format(
+        build_path))
     # JSON render file
-    render_file(tmp, 'packaging/pm.json', '{0}/{1}.json'.format(build_path, tmp['package_manager']))
+    render_file(tmp, 'packaging/{0}.json'.format(tmp['package_manager']),
+            '{0}/{1}.json'.format(build_path, tmp['package_manager']))
+    # Render changelog file
+    render_file(tmp, 'packaging/{0}_changelog'.format(tmp['package_manager']),
+            '{0}/{1}_changelog'.format(build_path, tmp['package_manager']))
     # Setup script
-    render_file(tmp, 'packaging/{0}_setup.sh'.format(tmp['package_manager']), '{0}/{1}_setup.sh'.format(build_path, tmp['package_manager']))
-
+    render_file(tmp, 'packaging/{0}_setup.sh'.format(
+        tmp['package_manager']), '{0}/{1}_setup.sh'.format(
+            build_path, tmp['package_manager']))
