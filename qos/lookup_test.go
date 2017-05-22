@@ -11,7 +11,7 @@ func TestIOMapCrud(t *testing.T) {
 	iom := NewIOMap()
 
 	key := "foo"
-	duration := 1 * time.Millisecond
+	duration := 1 * time.Second
 	read := uint64(1)
 	write := uint64(1)
 	iom.Add(key, duration, read, write)
@@ -31,7 +31,7 @@ func TestIOMapCrud(t *testing.T) {
 
 	readUpdate := uint64(2)
 	writeUpdate := uint64(2)
-	durationUpdate := 2 * time.Millisecond
+	durationUpdate := 2 * time.Second
 	iom.Update(key, durationUpdate, readUpdate, writeUpdate)
 
 	c, exists = iom.Get(key)
@@ -60,14 +60,14 @@ func TestIOMapFindPath(t *testing.T) {
 	iom := IOMap{Map: make(map[string]*IOC), Mutex: sync.RWMutex{}}
 
 	keyFoo := "/foo/foo"
-	duration := 1 * time.Millisecond
+	duration := 1 * time.Second
 	read := uint64(1)
 	write := uint64(1)
 	iom.Add(keyFoo, duration, read, write)
 	keyBar := "/foo/bar"
 	read2 := uint64(2)
 	write2 := uint64(2)
-	duration2 := 2 * time.Millisecond
+	duration2 := 2 * time.Second
 	iom.Add(keyBar, duration2, read2, write2)
 
 	fooTest := "/foo/foo/test"
