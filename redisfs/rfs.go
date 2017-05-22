@@ -114,7 +114,6 @@ func (rd *RDir) Lookup(ctx context.Context, req *fuse.LookupRequest, resp *fuse.
 		case "pubsub":
 			return &RedisPipe{Topic: topic, FileName: name, Opts: rd.RFS.Opts}, nil
 		}
-
 	}
 	return &RDir{Path: path, RFS: rd.RFS}, nil
 }
@@ -141,22 +140,16 @@ func (rp *RedisPipe) Attr(ctx context.Context, a *fuse.Attr) error {
 
 var _ fs.Node = (*RedisPipe)(nil)
 
-func (rp *RedisPipe) connect() {
-	if rp.Client == nil {
-		rp.Client = redis.NewClient(rp.Opts)
-	}
+func (rp *RedisPipe) connect() *redis.Client {
+	return redis.NewClient(rp.Opts)
 }
 
-func (rp *RedisPipe) subscribe() {
-	if rp.Client == nil {
-		rp.connect()
-	}
-	if rp.PubSub == nil {
-		rp.PubSub = rp.Client.Subscribe(rp.Topic)
-	}
+func (rp *RedisPipe) subscribe() *redis.PubSub {
+	c := rp.connect()
+	return c.Subscribe(rp.Topic)
 }
 
-// Open ... manage cache ect
+// Open ... Manage cache ect
 func (rp *RedisPipe) Open(ctx context.Context, req *fuse.OpenRequest, resp *fuse.OpenResponse) (fs.Handle, error) {
 	// Disable cache
 	resp.Flags |= fuse.OpenDirectIO
@@ -172,16 +165,15 @@ var _ fs.NodeOpener = (*RedisPipe)(nil)
 // errors - stream of error messages
 func (rp *RedisPipe) Read(ctx context.Context, req *fuse.ReadRequest, resp *fuse.ReadResponse) error {
 	var err error
-	if rp.PubSub == nil {
-		rp.subscribe()
-	}
+	pubSub := rp.subscribe()
 	buf := new(bytes.Buffer)
 	switch rp.FileName {
 	case pubSubRaw:
-		m, err := rp.PubSub.ReceiveMessage()
-		if err != nil {
-			return err
-		}
+		start := time.Now()
+		m := <-pubSub.Channel()
+		diff := time.Now().Sub(start)
+		fmt.Printf("Receive took %v\n", diff)
+		fmt.Printf("Read in message %s\n", m.Payload)
 		buf.Write([]byte(m.Payload))
 	case pubSubMessages:
 		m, err := rp.PubSub.ReceiveMessage()
@@ -194,6 +186,7 @@ func (rp *RedisPipe) Read(ctx context.Context, req *fuse.ReadRequest, resp *fuse
 		}
 		buf.Write([]byte(m.Payload))
 	}
+	fmt.Printf("Bytes writing is %s\n", string(buf.Bytes()))
 	resp.Data = buf.Bytes()
 	return err
 }
@@ -202,19 +195,27 @@ var _ = fs.HandleReader(&RedisPipe{})
 
 // Write ... Write a message to the PubSub
 func (rp *RedisPipe) Write(ctx context.Context, req *fuse.WriteRequest, resp *fuse.WriteResponse) error {
+	log.Printf("Write requested\n")
 	var err error
-	if rp.Client == nil {
-		rp.subscribe()
-	}
+	client := rp.connect()
 
 	buf := new(bytes.Buffer)
 	switch rp.FileName {
 	case pubSubRaw:
-		buf.Write([]byte(req.Data))
-		err = rp.Client.Publish(rp.Topic, buf.String()).Err()
+		buf.Write(req.Data)
+		start := time.Now()
+		fmt.Printf("Writing %s\n", buf.String())
+		cmd := client.Publish(rp.Topic, buf.String())
+		diff := time.Now().Sub(start)
+		fmt.Printf("Publishing took %v\n", diff)
+
+		err = cmd.Err()
 		if err != nil {
+			log.Printf("ERROR: on publish %s\n", err)
 			return err
 		}
+		fmt.Printf("Wrote %d\n", cmd.Val())
+
 	case pubSubMessages:
 		size := len(req.Data)
 		err = binary.Write(buf, binary.LittleEndian, size)
@@ -227,7 +228,7 @@ func (rp *RedisPipe) Write(ctx context.Context, req *fuse.WriteRequest, resp *fu
 			return err
 		}
 	}
-	resp.Size = len(req.Data)
+	resp.Size = len(buf.Bytes())
 	return err
 }
 
