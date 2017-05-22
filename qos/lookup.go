@@ -42,7 +42,7 @@ func LoadIOCConfig(f io.Reader) *IOMap {
 			log.Fatalf("Error parsing write limit %s", writeConf)
 		}
 
-		mapping.Add(path, time.Duration(duration)*time.Millisecond, read, write)
+		mapping.Add(path, time.Duration(duration)*time.Second, read, write)
 	}
 	return mapping
 
