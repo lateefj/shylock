@@ -1,6 +1,6 @@
 {
   "name": "${app_name}",
-  "maintainer": "Lateef jackson <lateef@newrelic.com.com>",
+  "maintainer": "Lateef jackson <lateef.jackson@gmail.com>",
   "license": "LICENSE",
   "url": "https://github.com/lateefj/shylock",
   "files": [

@@ -2,6 +2,7 @@ package qos
 
 import (
 	"encoding/csv"
+	"fmt"
 	"io"
 	"log"
 	"strconv"
@@ -23,16 +24,15 @@ func LoadIOCConfig(f io.Reader) *IOMap {
 		if err != nil {
 			log.Fatalf("Error parsing io.Reader with error: %s", err)
 		}
+		if len(record) < 3 { // Skip empty or incomplete lines
+			continue
+		}
+		fmt.Printf("Record is %v\n", record)
 
 		path := strings.TrimSpace(record[0])
-		durationConf := record[1]
-		readConf := record[2]
-		writeConf := record[3]
+		readConf := record[1]
+		writeConf := record[2]
 
-		duration, err := strconv.Atoi(durationConf)
-		if err != nil {
-			log.Fatalf("Error parsing duration %s", durationConf)
-		}
 		read, err := strconv.ParseUint(readConf, 10, 64)
 		if err != nil {
 			log.Fatalf("Error parsing read limit %s", readConf)
@@ -42,7 +42,8 @@ func LoadIOCConfig(f io.Reader) *IOMap {
 			log.Fatalf("Error parsing write limit %s", writeConf)
 		}
 
-		mapping.Add(path, time.Duration(duration)*time.Second, read, write)
+		mapping.Add(path, 1*time.Second, read, write)
+		fmt.Printf("Path %s read %d write %d\n", path, read, write)
 	}
 	return mapping
 

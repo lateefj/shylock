@@ -13,12 +13,11 @@ import (
 
 func TestHandleGetDeletePutPost(t *testing.T) {
 	k := "test"
-	duration := 1
 	read := uint64(1)
 	write := uint64(1)
 	iom := NewIOMap()
 
-	jsonc := &jsonIOC{Key: k, Duration: duration, ReadLimit: read, WriteLimit: write}
+	jsonc := &jsonIOC{Key: k, ReadLimit: read, WriteLimit: write}
 	bits, err := json.Marshal(jsonc)
 	if err != nil {
 		t.Fatalf("Failed to marshal %s", err)
