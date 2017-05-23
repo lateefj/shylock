@@ -10,7 +10,6 @@ import (
 
 type jsonIOC struct {
 	Key        string `json:"key"`
-	Duration   int    `json:"duration"`
 	ReadLimit  uint64 `json:"read_limit"`
 	WriteLimit uint64 `json:"write_limit"`
 }
@@ -37,7 +36,7 @@ func NewRest(m *IOMap) *Rest {
 }
 
 func (r *Rest) handleGet(key string, ioc *IOC, w http.ResponseWriter) {
-	jioc := &jsonIOC{Key: key, Duration: int(ioc.duration.Seconds() * 1000), ReadLimit: ioc.readLimit.Limit, WriteLimit: ioc.writeLimit.Limit}
+	jioc := &jsonIOC{Key: key, ReadLimit: ioc.readLimit.Limit, WriteLimit: ioc.writeLimit.Limit}
 	bits, err := json.Marshal(jioc)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -54,7 +53,7 @@ func (r *Rest) updateIOC(key string, ioc *IOC, req *http.Request, w http.Respons
 		w.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprintf(w, "Unmarshal error: %s", err.Error())
 	}
-	r.iom.Update(key, time.Duration(tmp.Duration)*time.Millisecond, tmp.ReadLimit, tmp.WriteLimit)
+	r.iom.Update(key, 1*time.Second, tmp.ReadLimit, tmp.WriteLimit)
 	w.WriteHeader(http.StatusOK)
 }
 func (r *Rest) addIOC(key string, req *http.Request, w http.ResponseWriter) {
@@ -63,7 +62,7 @@ func (r *Rest) addIOC(key string, req *http.Request, w http.ResponseWriter) {
 		w.WriteHeader(http.StatusInternalServerError)
 		fmt.Fprintf(w, "Unmarshal error: %s", err.Error())
 	}
-	r.iom.Add(key, time.Duration(tmp.Duration)*time.Millisecond, tmp.ReadLimit, tmp.WriteLimit)
+	r.iom.Add(key, 1*time.Second, tmp.ReadLimit, tmp.WriteLimit)
 	w.WriteHeader(http.StatusOK)
 }
 

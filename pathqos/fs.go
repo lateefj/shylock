@@ -291,9 +291,9 @@ var (
 )
 
 func Mount(mountPoint string, ioMap *qos.IOMap) error {
-	iocDir = os.Getenv("PATHIOC_DIR")
+	iocDir = os.Getenv("PATHQOS_DIR")
 	if iocDir == "" {
-		log.Fatalf("PATHIOC_DIR (path to the actual files) is a required environment variable")
+		log.Fatalf("PATHQOS_DIR (path to the actual files) is a required environment variable")
 	}
 	c, err := fuse.Mount(mountPoint)
 	if err != nil {
