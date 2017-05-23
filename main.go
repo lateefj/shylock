@@ -64,7 +64,7 @@ func main() {
 	}
 	var err error
 	iom := qos.NewIOMap()
-	configFile := os.Getenv("IOC_FILE")
+	configFile := os.Getenv("QOS_FILE")
 	if configFile != "" {
 		iom, err = loadIOCConfig(configFile)
 		if err != nil {
