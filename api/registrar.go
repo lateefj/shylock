@@ -1,5 +1,10 @@
 package api
 
+import (
+	"errors"
+	"fmt"
+)
+
 type Registered struct {
 	MountPoint  string
 	FSType      string
@@ -26,4 +31,12 @@ func RegisterHeaderDevice(fsType string, imp HeaderDeviceBuilder) {
 }
 func RegisterDevice(fsType string, imp DeviceBuilder) {
 	reg.Devices[fsType] = imp
+}
+
+func MountHeaderDevice(fsType, mountPoint string, config map[string]string) (HeaderDevice, error) {
+	imp, exists := reg.HeaderDevices[fsType]
+	if !exists {
+		return nil, errors.New(fmt.Sprintf("No file system type %s", fsType))
+	}
+	return imp(mountPoint, config), nil
 }

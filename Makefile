@@ -22,6 +22,9 @@ build: clean
 	# OS X build
 	GOARCH=amd64 GOOS=darwin go build -ldflags "-s -w" -o build/darwin/$(APP)
 
+test: 
+	go test ./...
+
 package: 
 	./packaging/render.py
 
