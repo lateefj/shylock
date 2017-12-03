@@ -45,6 +45,17 @@ func TestMemoryLoopbackKV(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Should never error %s", err)
 	}
+	var config map[string]string
+	err = loopback.Mount(config)
+	if err != nil {
+		t.Fatalf("Should never fail %s", err)
+	}
+	defer func() {
+		err = loopback.Unmount()
+		if err != nil {
+			t.Fatalf("Should never fail %s", err)
+		}
+	}()
 	header := []byte("header")
 	body := []byte("body")
 	go func() {

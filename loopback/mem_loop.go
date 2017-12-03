@@ -2,7 +2,6 @@ package loopback
 
 import (
 	"errors"
-	"fmt"
 	"strings"
 
 	"github.com/lateefj/shylock/api"
@@ -113,7 +112,6 @@ func (mkv *HeaderMemoryLoopbackKV) List(path string) ([]string, error) {
 				if next > 0 {
 					s = s[:next]
 				}
-				fmt.Printf("From List item is  %s\n", s)
 				if len(s) > 0 {
 					files = append(files, k)
 				}
