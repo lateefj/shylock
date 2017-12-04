@@ -5,4 +5,6 @@ import (
 )
 
 func TestRegistered(t *testing.T) {
+	//RegisterDevice()
+
 }
