@@ -1,6 +1,6 @@
 {
   "name": "${app_name}",
-  "maintainer": "Lateef jackson <lateef@newrelic.com.com>",
+  "maintainer": "Lateef jackson <lateef.jackson@gmail.com>",
   "files": [
     {
       "from": "build/!arch!/!name!",
@@ -12,7 +12,7 @@
   "copyrights": [
     {
       "files": "*",
-      "copyright": "${year} Lateef Jackson <lateef@newrelic.com>",
+      "copyright": "${year} Lateef Jackson <lateef.jackson@gmail.com>",
       "license": "BSD",
       "file": "LICENSE"
     }
