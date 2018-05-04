@@ -7,16 +7,20 @@ all: build
 clean:
 	rm -fr build && mkdir -p build/{amd64,darwin}
 deps:
-	go get -u github.com/kardianos/govendor
+	# Someday switch to vgo once it works with the code
+	# go get -u golang.org/x/vgo
 
+	# vgo build
+
+	go get -u github.com/golang/dep/cmd/dep
 
 vendor: deps
-	mkdir -p vendor
-	govendor get
-	govendor fetch +all
-	govendor fmt 
+	dep ensure
+
+
 
 build: clean 
+	# vgo build
 	# Linux build
 	GOARCH=amd64 GOOS=linux go build -ldflags "-s -w" -o build/amd64/$(APP)
 	# OS X build
