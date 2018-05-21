@@ -9,7 +9,7 @@ type File interface {
 
 // Device ... Simplified interface for interacting with a device
 type Device interface {
-	Mount(config map[string]string) error
+	Mount(config []byte) error
 	Unmount() error
 	List(path string) ([]string, error)
 	Open(path string) (File, error)
@@ -25,7 +25,7 @@ type HeaderFile interface {
 
 // HeaderDevice ... Devices that have a header as part of reading / writing
 type HeaderDevice interface {
-	Mount(config map[string]string) error
+	Mount(config []byte) error
 	Unmount() error
 	List(path string) ([]string, error)
 	Open(path string) (HeaderFile, error)

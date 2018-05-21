@@ -2,6 +2,7 @@
 package buse
 
 import (
+	"fmt"
 	"hash/crc64"
 	"log"
 	"os"
@@ -72,10 +73,13 @@ func (fd *FuseDevice) Mount(mountPoint string, ioMap *qos.IOMap) error {
 	if err := fd.fuseConn.MountError; err != nil {
 		log.Printf("Failed to mount because %s", err)
 	}
+	if err == nil {
+		fmt.Printf("Fuse mount successful for mount point %s\n", mountPoint)
+	}
 	return err
 }
 
-// Exit ... Exit hook
+// Unmount ... Unmount hook
 func (fd *FuseDevice) Exit() error {
 	if fd.fuseConn != nil {
 		return fd.fuseConn.Close()
@@ -92,7 +96,7 @@ type FDDir struct {
 // Attr ... Required for fuse
 func (fdd *FDDir) Attr(ctx context.Context, attr *fuse.Attr) error {
 	attr.Inode = checksum(fdd.Key)
-	attr.Mode = os.ModeDir | 0555
+	attr.Mode = os.ModeDir | 0655
 	return nil
 }
 
@@ -136,6 +140,7 @@ var _ = fs.NodeRequestLookuper(&FDDir{})
 
 // Create ... file creating implementation
 func (fdd *FDDir) Create(ctx context.Context, req *fuse.CreateRequest, resp *fuse.CreateResponse) (fs.Node, fs.Handle, error) {
+	fmt.Printf("Trying to create file %s\n", req.Name)
 	p := path.Join(fdd.Key, req.Name)
 	f, err := fdd.FS.Device.Open(p)
 	if err != nil {

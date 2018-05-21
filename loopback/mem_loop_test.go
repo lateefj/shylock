@@ -6,7 +6,7 @@ import (
 )
 
 func TestMemoryLoopbackMQ(t *testing.T) {
-	loopback := NewHeaderMemoryLoopbackMQ("foo", map[string]string{})
+	loopback := NewHeaderMemoryLoopbackMQ("foo", []byte("config_data"))
 	mf, err := loopback.Open("bar")
 	if err != nil {
 		t.Fatalf("Should never error %s", err)
@@ -18,17 +18,20 @@ func TestMemoryLoopbackMQ(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to get with error %s", err)
 		}
-		if bytes.Compare(*h, header) != 0 {
-			t.Errorf("Expected header to be %s but was %s", string(header), string(*h))
+		if bytes.Compare(h, header) != 0 {
+			t.Errorf("Expected header to be %s but was %s", string(header), string(h))
 		}
-		if bytes.Compare(*b, body) != 0 {
-			t.Errorf("Expected body to be %s but was %s", string(body), string(*b))
+		if bytes.Compare(b, body) != 0 {
+			t.Errorf("Expected body to be %s but was %s", string(body), string(b))
 		}
 
 	}()
-	err = mf.Write(&header, &body)
+	written, err := mf.Write(0, header, body)
 	if err != nil {
 		t.Fatalf("Put failed %s", err)
+	}
+	if written != len(body)+len(header) {
+		t.Fatalf("Expected written to be header + body %d but is %d", (len(header) + len(body)), written)
 	}
 	names, err := loopback.List("")
 	if err != nil {
@@ -40,13 +43,12 @@ func TestMemoryLoopbackMQ(t *testing.T) {
 }
 
 func TestMemoryLoopbackKV(t *testing.T) {
-	loopback := NewHeaderMemoryLoopbackKV("foo", map[string]string{})
+	loopback := NewHeaderMemoryLoopbackKV("foo", []byte("config_data"))
 	mf, err := loopback.Open("bar")
 	if err != nil {
 		t.Fatalf("Should never error %s", err)
 	}
-	var config map[string]string
-	err = loopback.Mount(config)
+	err = loopback.Mount([]byte("Config Test Data"))
 	if err != nil {
 		t.Fatalf("Should never fail %s", err)
 	}
@@ -63,16 +65,19 @@ func TestMemoryLoopbackKV(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Failed to get with error %s", err)
 		}
-		if bytes.Compare(*h, header) != 0 {
-			t.Errorf("Expected header to be %s but was %s", string(header), string(*h))
+		if bytes.Compare(h, header) != 0 {
+			t.Errorf("Expected header to be %s but was %s", string(header), string(h))
 		}
-		if bytes.Compare(*b, body) != 0 {
-			t.Errorf("Expected body to be %s but was %s", string(body), string(*b))
+		if bytes.Compare(b, body) != 0 {
+			t.Errorf("Expected body to be %s but was %s", string(body), string(b))
 		}
 	}()
-	err = mf.Write(&header, &body)
+	written, err := mf.Write(0, header, body)
 	if err != nil {
 		t.Fatalf("Put failed %s", err)
+	}
+	if written != len(body)+len(header) {
+		t.Fatalf("Expected written to be header + body %d but is %d", (len(header) + len(body)), written)
 	}
 	names, err := loopback.List("")
 	if err != nil {

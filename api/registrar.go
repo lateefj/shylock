@@ -9,11 +9,11 @@ type Registered struct {
 	MountPoint  string
 	FSType      string
 	Description string
-	Config      map[string]string
+	Config      []byte
 }
 
-type HeaderDeviceBuilder func(mountPoint string, config map[string]string) HeaderDevice
-type DeviceBuilder func(mountPoint string, config map[string]string) Device
+type HeaderDeviceBuilder func(mountPoint string, config []byte) HeaderDevice
+type DeviceBuilder func(mountPoint string, config []byte) Device
 
 type Registrar struct {
 	HeaderDevices map[string]HeaderDeviceBuilder
@@ -33,8 +33,15 @@ func RegisterDevice(fsType string, imp DeviceBuilder) {
 	reg.Devices[fsType] = imp
 }
 
-func MountHeaderDevice(fsType, mountPoint string, config map[string]string) (HeaderDevice, error) {
+func MountHeaderDevice(fsType, mountPoint string, config []byte) (HeaderDevice, error) {
 	imp, exists := reg.HeaderDevices[fsType]
+	if !exists {
+		return nil, errors.New(fmt.Sprintf("No file system type %s", fsType))
+	}
+	return imp(mountPoint, config), nil
+}
+func MountDevice(fsType, mountPoint string, config []byte) (Device, error) {
+	imp, exists := reg.Devices[fsType]
 	if !exists {
 		return nil, errors.New(fmt.Sprintf("No file system type %s", fsType))
 	}
