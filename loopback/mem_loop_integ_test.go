@@ -13,13 +13,14 @@ import (
 )
 
 const (
-	TestFuseMemoryLoopbackKVPath = "/tmp/shylock/loopbackkv_test"
+	TestFuseMemoryLoopbackKVPath = "tmp/shylock/loopbackkv_test"
 )
 
 func TestFuseMemoryLoopbackKV(t *testing.T) {
 	// Create directory if it doesn't exist
 	if _, err := os.Stat(TestFuseMemoryLoopbackKVPath); os.IsNotExist(err) {
-		os.MkdirAll(TestFuseMemoryLoopbackKVPath, 0655)
+		fmt.Printf("Trying to create path %s\n", TestFuseMemoryLoopbackKVPath)
+		os.MkdirAll(TestFuseMemoryLoopbackKVPath, 0755)
 	}
 	err := shylock.MountFuse(TestFuseMemoryLoopbackKVPath, FSMemoryLoopbacKV, []byte("Empty Config"))
 	if err != nil {

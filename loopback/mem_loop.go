@@ -10,16 +10,16 @@ import (
 var unknownError error
 
 const (
-	FSMemoryLoopbackHeaderMQ = "memory_loopback_header_mq"
-	FSMemoryLoopbacHeaderKV  = "memory_loopback_header_kv"
-	FSMemoryLoopbacKV        = "memory_loopback_kv"
+	FSMemoryLoopbackHeaderMQ = "LOOPBACK_HEADER_MQ"
+	FSMemoryLoopbacHeaderKV  = "LOOPBACK_HEADER_KV"
+	FSMemoryLoopbacKV        = "LOOPBACK_KV"
 )
 
 func init() {
 	unknownError = errors.New("Unknown Error")
-	api.RegisterHeaderDevice(FSMemoryLoopbackHeaderMQ, NewHeaderMemoryLoopbackMQ)
-	api.RegisterHeaderDevice(FSMemoryLoopbacHeaderKV, NewHeaderMemoryLoopbackKV)
-	api.RegisterDevice(FSMemoryLoopbacKV, NewMemoryLoopbackKV)
+	/*api.RegisterHeaderDevice(FSMemoryLoopbackHeaderMQ, NewHeaderMemoryLoopbackMQ)
+	api.RegisterHeaderDevice(FSMemoryLoopbacHeaderKV, NewHeaderMemoryLoopbackKV)*/
+	api.RegisterSimpleDevice(FSMemoryLoopbacKV, NewMemoryLoopbackKV)
 }
 
 type HeaderMemoryFileMQ struct {
@@ -163,7 +163,7 @@ type MemoryLoopbackKV struct {
 	db map[string]*MemoryFileKV
 }
 
-func NewMemoryLoopbackKV(mountPoint string, config []byte) api.Device {
+func NewMemoryLoopbackKV(mountPoint string, config []byte) api.SimpleDevice {
 	return &MemoryLoopbackKV{db: make(map[string]*MemoryFileKV)}
 }
 
@@ -193,11 +193,19 @@ func (mkv *MemoryLoopbackKV) List(path string) ([]string, error) {
 	return files, nil
 }
 
-func (mkv *MemoryLoopbackKV) Open(path string) (api.File, error) {
+func (mkv *MemoryLoopbackKV) Open(path string) (api.SimpleFile, error) {
 	f, exists := mkv.db[path]
 	if !exists {
 		f = &MemoryFileKV{}
 		mkv.db[path] = f
 	}
 	return f, nil
+}
+
+func (mkv *MemoryLoopbackKV) Remove(path string) error {
+	_, exists := mkv.db[path]
+	if exists {
+		delete(mkv.db, path)
+	}
+	return nil
 }

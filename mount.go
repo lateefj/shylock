@@ -3,6 +3,7 @@ package shylock
 import (
 	"errors"
 	"fmt"
+	"log"
 
 	"github.com/lateefj/shylock/api"
 	"github.com/lateefj/shylock/buse"
@@ -34,14 +35,16 @@ func MountFuse(mountPath, fsType string, config []byte) error {
 		device.Unmount()
 		return err
 	}
-	err = fuseDevice.Mount(mountPath, nil)
-	if err != nil {
-		return err
-	}
-	// Start tracking list of devices
-	mountedDevices = append(mountedDevices, device)
-	mountedFuse = append(mountedFuse, fuseDevice)
+	go func() {
+		err = fuseDevice.Mount(mountPath, nil)
+		if err != nil {
+			log.Panicf("Failed to mount %s\n", mountPath)
+		}
+		// Start tracking list of devices
+		mountedDevices = append(mountedDevices, device)
+		mountedFuse = append(mountedFuse, fuseDevice)
 
+	}()
 	return nil
 }
 
