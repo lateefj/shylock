@@ -1,26 +1,44 @@
-SHELL := /bin/bash
+SHELL := /bin/bash -x
 APP := shylock
 VERSION := `cat VERSION`
+
+# Support binary builds
+PLATFORMS := linux darwin freebsd
 
 all: build
 
 clean:
-	rm -fr build && mkdir -p build/{amd64,darwin}
-deps:
-	go get -u github.com/kardianos/govendor
+	rm -fr build 
+	echo $(PLATFORMS)
+	@- $(foreach PLAT,$(PLATFORMS), \
+		mkdir -p build/$(PLAT) \
+		)
 
+deps:
+	# Someday switch to vgo once it works with the code
+	# go get -u golang.org/x/vgo
+
+	# vgo build
+
+	go get -u github.com/golang/dep/cmd/dep
 
 vendor: deps
-	mkdir -p vendor
-	govendor get
-	govendor fetch +all
-	govendor fmt 
+	dep ensure
+
 
 build: clean 
-	# Linux build
-	GOARCH=amd64 GOOS=linux go build -ldflags "-s -w" -o build/amd64/$(APP)
-	# OS X build
-	GOARCH=amd64 GOOS=darwin go build -ldflags "-s -w" -o build/darwin/$(APP)
+
+	for plat in $(PLATFORMS); do \
+		echo "Building $$plat ..." ; \
+		GOARCH=amd64 GOOS=$$plat go build -ldflags "-s -w" -o build/$$plat/$(APP) cmd/shylock/main.go ; \
+	done
+
+
+test: 
+	go test ./...
+
+test-integration: 
+	go test ./... --tags=integration
 
 package: 
 	./packaging/render.py
