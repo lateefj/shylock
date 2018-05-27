@@ -20,7 +20,7 @@ Currently shylock is in Proof of Concept (POC). The next step is to get enough i
 
 * QOS if applicable
 * Unit Tests
-* Functional Tests
+* Integration Tests
 * Benchmarks
 
 Integrated Systems

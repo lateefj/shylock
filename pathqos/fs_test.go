@@ -6,11 +6,11 @@ import (
 
 	//"golang.org/x/net/context"
 
-	"github.com/lateefj/shylock/ioc"
+	"github.com/lateefj/shylock/qos"
 )
 
 func TestSFSRoot(t *testing.T) {
-	iom := &ioc.IOMap{Map: make(map[string]*ioc.IOC), Mutex: sync.RWMutex{}}
+	iom := &qos.IOMap{Map: make(map[string]*qos.IOC), Mutex: sync.RWMutex{}}
 	path := "/tmp/sfs"
 	sfs := NewSFS(path, iom)
 	_, err := sfs.Root()

@@ -94,8 +94,4 @@ func TestFuseMemoryLoopbackKV(t *testing.T) {
 		t.Fatalf("Didn't expect file %s in directory list %s\n", testPath, files)
 	}
 
-	// TODO:
-	// 4. Verify that the data is in memory
-	// 5. Read from the path and make sure the values match.
-
 }
