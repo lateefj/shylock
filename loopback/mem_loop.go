@@ -2,6 +2,7 @@ package loopback
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 
 	"github.com/lateefj/shylock/api"
@@ -115,6 +116,7 @@ func (mkv *HeaderMemoryLoopbackKV) Unmount() error {
 	return nil
 }
 func (mkv *HeaderMemoryLoopbackKV) List(path string) ([]string, error) {
+
 	files := make([]string, 0)
 	for k, _ := range mkv.db {
 		if len(k) > len(path) {
@@ -174,6 +176,8 @@ func (mkv *MemoryLoopbackKV) Unmount() error {
 	return nil
 }
 func (mkv *MemoryLoopbackKV) List(path string) ([]string, error) {
+
+	fmt.Printf("List for kv\n")
 	files := make([]string, 0)
 	for k, _ := range mkv.db {
 		if len(k) > len(path) {
@@ -194,6 +198,7 @@ func (mkv *MemoryLoopbackKV) List(path string) ([]string, error) {
 }
 
 func (mkv *MemoryLoopbackKV) Open(path string) (api.SimpleFile, error) {
+	fmt.Printf("Trying to Open %s\n", path)
 	f, exists := mkv.db[path]
 	if !exists {
 		f = &MemoryFileKV{}

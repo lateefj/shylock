@@ -16,20 +16,20 @@ const (
 
 var (
 	mountSystemNotSupported = errors.New("Mount System Not Supported")
-	mountedDevices          = make([]api.Device, 0)
-	mountedFuse             = make([]*buse.FuseDevice, 0)
+	mountedDevices          = make([]api.SimpleDevice, 0)
+	mountedFuse             = make([]*buse.FuseSimpleDevice, 0)
 )
 
 // mountFuse ... binds together using fuse and whatever the custom interface
 // decoupling fuse and the custom systems
 func MountFuse(mountPath, fsType string, config []byte) error {
-	device, err := api.MountDevice(fsType, mountPath, config)
+	device, err := api.MountSimpleDevice(fsType, mountPath, config)
 	if err != nil {
 		return err
 	}
 
 	// Append to the list of devices
-	fuseDevice, err := buse.NewFuseDevice(mountPath, device)
+	fuseDevice, err := buse.NewFuseSimpleDevice(mountPath, device)
 	if err != nil {
 		// Try to exit cleanly
 		device.Unmount()

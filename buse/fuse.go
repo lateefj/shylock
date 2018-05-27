@@ -25,24 +25,24 @@ func checksum(key string) uint64 {
 }
 
 // Fuse ... Fuse wrapper
-type FuseDevice struct {
+type FuseSimpleDevice struct {
 	MountPoint string
-	api.Device
+	api.SimpleDevice
 	fuseConn *fuse.Conn
 }
 
 // NewFuse ... Create a new Fuse instance
-func NewFuseDevice(mountPoint string, device api.Device) (*FuseDevice, error) {
-	return &FuseDevice{MountPoint: mountPoint, Device: device}, nil
+func NewFuseSimpleDevice(mountPoint string, device api.SimpleDevice) (*FuseSimpleDevice, error) {
+	return &FuseSimpleDevice{MountPoint: mountPoint, SimpleDevice: device}, nil
 }
 
 // fsNode ... Looks up the in device
-func (fd *FuseDevice) fsNode(ctx context.Context, key string) (fs.Node, error) {
+func (fd *FuseSimpleDevice) fsNode(ctx context.Context, key string) (fs.Node, error) {
 
 	if key[:len(key)-1] == "/" {
 		return &FDDir{FS: fd, Key: key}, nil
 	}
-	f, err := fd.Device.Open(key)
+	f, err := fd.SimpleDevice.Open(key)
 	if err != nil {
 		return nil, err
 	}
@@ -50,12 +50,12 @@ func (fd *FuseDevice) fsNode(ctx context.Context, key string) (fs.Node, error) {
 }
 
 // Root ... Required for fuse system
-func (fd *FuseDevice) Root() (fs.Node, error) {
+func (fd *FuseSimpleDevice) Root() (fs.Node, error) {
 	return fd.fsNode(context.Background(), fd.MountPoint)
 }
 
 // Mount ... Connect to fuse
-func (fd *FuseDevice) Mount(mountPoint string, ioMap *qos.IOMap) error {
+func (fd *FuseSimpleDevice) Mount(mountPoint string, ioMap *qos.IOMap) error {
 
 	var err error
 	fd.fuseConn, err = fuse.Mount(mountPoint)
@@ -80,7 +80,7 @@ func (fd *FuseDevice) Mount(mountPoint string, ioMap *qos.IOMap) error {
 }
 
 // Unmount ... Unmount hook
-func (fd *FuseDevice) Exit() error {
+func (fd *FuseSimpleDevice) Exit() error {
 	if fd.fuseConn != nil {
 		return fd.fuseConn.Close()
 	}
@@ -90,7 +90,7 @@ func (fd *FuseDevice) Exit() error {
 // FDDir ... Directory entry which is not really a thing
 type FDDir struct {
 	Key string
-	FS  *FuseDevice
+	FS  *FuseSimpleDevice
 }
 
 // Attr ... Required for fuse
@@ -105,7 +105,7 @@ var _ fs.Node = (*FDDir)(nil)
 // ReadDirAll ... Get everything in a directory
 func (fdd *FDDir) ReadDirAll(ctx context.Context) ([]fuse.Dirent, error) {
 	// Refresh the directory listing
-	fileNames, err := fdd.FS.Device.List(fdd.Key)
+	fileNames, err := fdd.FS.SimpleDevice.List(fdd.Key)
 	if err != nil {
 		return make([]fuse.Dirent, 0), err
 	}
@@ -133,6 +133,7 @@ var _ = fs.HandleReadDirAller(&FDDir{})
 // Lookup ... Fuse lookup
 func (fdd *FDDir) Lookup(ctx context.Context, req *fuse.LookupRequest, resp *fuse.LookupResponse) (fs.Node, error) {
 
+	fmt.Printf("Lookup request %s\n", req.Name)
 	return fdd.FS.fsNode(ctx, path.Join(fdd.Key, req.Name))
 }
 
@@ -142,7 +143,7 @@ var _ = fs.NodeRequestLookuper(&FDDir{})
 func (fdd *FDDir) Create(ctx context.Context, req *fuse.CreateRequest, resp *fuse.CreateResponse) (fs.Node, fs.Handle, error) {
 	fmt.Printf("Trying to create file %s\n", req.Name)
 	p := path.Join(fdd.Key, req.Name)
-	f, err := fdd.FS.Device.Open(p)
+	f, err := fdd.FS.SimpleDevice.Open(p)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -160,9 +161,9 @@ var _ = fs.NodeCreater(&FDDir{})
 
 // FDFile ... File entry in Device
 type FDFile struct {
-	File api.File
+	File api.SimpleFile
 	Key  string
-	FS   *FuseDevice
+	FS   *FuseSimpleDevice
 }
 
 // Attr ... Fuse atter
@@ -180,6 +181,7 @@ var _ fs.Node = (*FDFile)(nil)
 
 // Open ... file should already be open
 func (fdf *FDFile) Open(ctx context.Context, req *fuse.OpenRequest, resp *fuse.OpenResponse) (fs.Handle, error) {
+	fmt.Printf("Open is being called  %s...\n", fdf.Key)
 	// Disable cache
 	resp.Flags |= fuse.OpenDirectIO
 	return fdf, nil
