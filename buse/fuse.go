@@ -78,9 +78,11 @@ func (fd *FuseSimpleDevice) Mount(mountPoint string, ioMap *qos.IOMap) error {
 	}
 	return err
 }
-
-// Unmount ... Unmount hook
 func (fd *FuseSimpleDevice) Exit() error {
+	return fd.Unmount()
+}
+// Unmount ... Unmount hook
+func (fd *FuseSimpleDevice) Unmount() error {
 	if fd.fuseConn != nil {
 		return fd.fuseConn.Close()
 	}
